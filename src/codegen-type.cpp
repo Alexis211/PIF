@@ -36,6 +36,25 @@ IntTypeAST *IntTypeAST::Get(short size, bool sign) {
 	return intTypes[id];
 }
 
+map<string, FuncTypeAST*> funcTypes;
+FuncTypeAST *FuncTypeAST::Get(const std::vector<FuncArgAST*> &args, TypeAST* retType) {
+	string id = "(";
+	for (unsigned i = 0; i < args.size(); i++) {
+		if (i > 0) id += ",";
+		id += args[i]->Name + ":" + args[i]->ArgType->typeDescStr();
+	}
+	id += ")->" + retType->typeDescStr();
+
+	if (funcTypes.count(id) == 0) {
+		funcTypes[id] = new FuncTypeAST(args, retType);
+	} else {
+		for (unsigned i = 0; i < args.size(); i++) {
+			delete args[i];	// THIS IS DANGEROUS BUT IT IS.
+		}
+	}
+	return funcTypes[id];
+}
+
 // Get LLVM type from TypeAST 
 
 Type *PackageTypeAST::getTy() {

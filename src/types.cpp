@@ -68,25 +68,13 @@ bool TypeAST::eq(TypeAST *other) {
 	return (this == other);
 }
 
-bool FuncTypeAST::eq(TypeAST *other) {
-	FuncTypeAST *ft = dynamic_cast<FuncTypeAST*>(other);
-	if (ft == 0) return false;
-	if (ft == this) return true;
 
-	if (!ft->ReturnType->eq(ReturnType)) return false;
-	if (Args.size() != ft->Args.size()) return false;
-	for (unsigned i = 0; i < Args.size(); i++) {
-		if (!Args[i]->ArgType->eq(ft->Args[i]->ArgType)) return false;
-	}
-	return true;
+bool TypeAST::canDeref() {
+	return false;
 }
 
-bool RefTypeAST::eq(TypeAST *other) {
-	if (this == other) return true;
-
-	RefTypeAST *o = dynamic_cast<RefTypeAST*>(other);
-	if (o == 0) return false;
-	return VType->eq(o->VType);
+bool RefTypeAST::canDeref() {
+	return (dynamic_cast<FuncTypeAST*>(VType) == 0);
 }
 
 // Type conversions
@@ -110,8 +98,7 @@ ExprAST *ExprAST::asType(TypeAST *ty) {
 	TypeAST *thisty = this->type(Ctx);
 	if (thisty->eq(ty)) return this;
 
-	RefTypeAST *trty = dynamic_cast<RefTypeAST*>(thisty);
-	if (trty != 0) {
+	if (thisty->canDeref()) {
 		ExprAST *at = new DerefExprAST(Tag, this);
 		if (at->type(Ctx)->eq(ty)) return at;
 		at = at->asType(ty);
@@ -251,12 +238,12 @@ TypeAST *BinaryExprAST::getType() {
 		TypeAST *retT = (retBool ? BOOLTYPE : 0);
 
 		TypeAST *lt = LHS->type(Ctx);
-		while (lt != 0 && dynamic_cast<RefTypeAST*>(lt) != 0) {
+		while (lt != 0 && lt->canDeref()) {
 			LHS = new DerefExprAST(Tag, LHS);
 			lt = LHS->type(Ctx);
 		}
 		TypeAST *rt = RHS->type(Ctx);
-		while (rt != 0 && dynamic_cast<RefTypeAST*>(rt) != 0) {
+		while (rt != 0 && rt->canDeref()) {
 			RHS = new DerefExprAST(Tag, RHS);
 			rt = RHS->type(Ctx);
 		}
@@ -351,7 +338,7 @@ TypeAST *CastExprAST::getType() {
 		}
 
 		// Nothing found, try dereferencing and looping again
-		if (dynamic_cast<RefTypeAST*>(fromT) != 0) {
+		if (fromT->canDeref()) {
 			Expr = new DerefExprAST(Tag, Expr);
 			fromT = Expr->type(Ctx);
 			if (fromT == 0) {

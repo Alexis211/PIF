@@ -26,6 +26,7 @@ class TypeAST {
 	virtual llvm::Type *getTy() = 0;
 	virtual bool eq(TypeAST *other);
 
+	virtual bool canDeref();
 	virtual std::string typeDescStr() = 0;
 
 	virtual llvm::Value *castCodegen(llvm::Value *v, TypeAST *origType, Context *ctx);
@@ -116,10 +117,12 @@ class FuncTypeAST : public TypeAST {
 
 	std::vector<FuncArgAST*> Args;
 	TypeAST* ReturnType;
-	public:
+
 	FuncTypeAST(const std::vector<FuncArgAST*> &args, TypeAST* retType) : Args(args), ReturnType(retType) {};
+	public:
+	static FuncTypeAST *Get(const std::vector<FuncArgAST*> &args, TypeAST* retType);
+
 	virtual llvm::Type *getTy();
-	virtual bool eq(TypeAST *other);
 
 	virtual std::string typeDescStr();
 };
@@ -139,7 +142,8 @@ class RefTypeAST : public TypeAST {
 
 	public:
 	static RefTypeAST *Get(TypeAST *type);
-	virtual bool eq(TypeAST *other);
+
+	virtual bool canDeref();
 
 	virtual llvm::Type *getTy();
 

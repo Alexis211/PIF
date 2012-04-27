@@ -74,9 +74,9 @@ FuncTypeAST *Parser::ParsePrototype() {
 	if (Lex.tokStr != "->") return (FuncTypeAST*) error("Invalid prototype : was expecting '->', not '" + Lex.tokStr + "'.");
 	Lex.gettok();	// eat '->'
 	if (Lex.tokStr == "{") {
-		return new FuncTypeAST(args, VOIDTYPE);
+		return FuncTypeAST::Get(args, VOIDTYPE);
 	}
 	TypeAST *retType = ParseType();
 	if (retType == 0) return 0;
-	return new FuncTypeAST(args, retType);
+	return FuncTypeAST::Get(args, retType);
 }

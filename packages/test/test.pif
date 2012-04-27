@@ -33,7 +33,7 @@ func print_some_sinuses : () -> {
 	util.print_nl()
 }
 
-func getval : (f : &(a : float) -> float, x : float) -> float {
+func getval : (f : &(x : float) -> float, x : float) -> float {
 	return f(x)
 }
 

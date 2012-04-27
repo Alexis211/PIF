@@ -126,7 +126,7 @@ bool Package::import(ImportAST *def) {
 					"_init",
 					new FuncExprAST(
 						FTag(),
-						new FuncTypeAST(vector<FuncArgAST*>(), BaseTypeAST::Get(bt_void)),
+						FuncTypeAST::Get(vector<FuncArgAST*>(), BaseTypeAST::Get(bt_void)),
 						new BlockAST(FTag(), vector<StmtAST*>(1, 
 							new ExprStmtAST(FTag(), new ReturnAST(FTag(), 0)))
 						) 
