@@ -2,15 +2,17 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <stdlib.h>
 
 #include <llvm/Support/raw_ostream.h>
 
 #include "Generator.h"
+#include "util.h"
 
 using namespace std;
 
 string pkgPath = DEFAULT_PKG_PATH;
-bool DEBUG = DEFAULT_DEBUG;
+int DEBUGLevel;
 
 extern "C" void print_int(INT i) {
 	cout << i << " " << flush;
@@ -24,18 +26,31 @@ extern "C" void print_nl() {
 	cout << endl;
 }
 
-int main() {
-	cout << "PIF compiler version 0.1 - adnab.fr.nf 2012\n" << endl;
+int main(int argc, char *argv[]) {
+	cout << endl << "PIF compiler version 0.1 - adnab.fr.nf 2012" << endl << endl;
+
+	ArgParser args(argc, argv);
+	args.addStr("-d", DEFAULT_DEBUG);
+
+	DEBUGLevel = atoi(args.getStr("-d").c_str());
 
 	Generator *gen = new Generator();
+	Package *pkg = new Package(gen, "_");		// Interpreter context
 
-	Package *pkg = new Package(gen, "__pif_main");		// Interpreter context
-	vector<string> v; v.push_back("test");
-	pkg->import(new ImportAST(FTag(), v, "main"));
-	if (pkg->Imports.count("main") > 0) {
-		gen->main(pkg->Imports["main"]);
+	const vector<string> &pkgs = args.getParams();
+	if (pkgs.size() == 0) {
+		cout << "Usage : " << args.getBinName() << " [options] package..." << endl;
+		cout << "Options:" << endl;
+		cout << "    -d <debug_level>\tVerbosity level for debug information (default: " << DEFAULT_DEBUG << ")" << endl;
+		cout << "\t\t\tSee source in config.h for detailed info about debug level." << endl;
+		cout << endl;
 	} else {
-		cerr << "KYAAAA ! IT DIDN'T COMPILE !!" << endl;
+		for (unsigned i = 0; i < pkgs.size(); i++) {
+			if (!pkg->importAndRunMain(pkgs[i])) {
+				cerr << "KYAAAA ! IT DIDN'T COMPILE !!" << endl;
+				break;
+			}
+		}
 	}
 
 	std::string err;

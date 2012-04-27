@@ -1,4 +1,5 @@
 #include "Generator.h"
+#include "util.h"
 
 using namespace llvm;
 using namespace std;
@@ -31,14 +32,20 @@ bool Generator::build(Package *pkg) {
 	// Setup package symbol table
 	for (map<string, Symbol*>::iterator it = pkg->Symbols.begin(); it != pkg->Symbols.end(); it++) {
 
-		cerr << "setup: " << it->first << " : " << it->second->SType->typeDescStr() << endl;
+		DBGP(cerr << "setup: " << it->first << " : " << it->second->SType->typeDescStr() << endl)
 
 		DefAST *d = it->second->Def;
 
 		if (VarDefAST *vd = dynamic_cast<VarDefAST*>(d)) {
+
+			DBGC(cerr << " -> " << (vd->Var ? "var" : "const" ) << " = "; vd->Val->prettyprint(cerr))
+
 			GlobalVariable *pos = new GlobalVariable(*TheModule, vd->VType->getTy(), false, GlobalValue::ExternalLinkage, UndefValue::get(vd->VType->getTy()), prefix + d->Name);
 			it->second->llvmVal = pos;
 		} else if (FuncDefAST *fd = dynamic_cast<FuncDefAST*>(d)) {
+
+			DBGC(cerr << " -> func = "; fd->Val->prettyprint(cerr))
+
 			string sym_name = prefix + fd->Name;
 			FunctionType *ft = dyn_cast<FunctionType>(fd->Val->FType->getTy());
 			if (ft == 0) {
@@ -62,7 +69,8 @@ bool Generator::build(Package *pkg) {
 			it->second->llvmVal = ed->Val->Codegen();
 		}
 	}
-	cerr << "Symbols ok" << endl;
+
+	DBGP(cerr << "Symbols ok" << endl)
 
 	// Generate code for functions
 	for (map<string, Symbol*>::iterator it = pkg->Symbols.begin(); it != pkg->Symbols.end(); it++) {
@@ -92,14 +100,12 @@ bool Generator::build(Package *pkg) {
 
 			if (fd->Name == "_init") {
 				pkg->InitFunction = f;
-				for (unsigned i = 0; i < pkg->VarDefs.size(); i++) {
-					VarDefAST *vd = dynamic_cast<VarDefAST*>(pkg->VarDefs[i]->Def);
-					if (vd == 0) {
-						cerr << " (INTERNAL ERROR) global variable is not a variable." << endl;
-						return false;
-					}
+				for (unsigned i = 0; i < pkg->SymbolDefOrder.size(); i++) {
+					Symbol *s = pkg->SymbolDefOrder[i];
+					VarDefAST *vd = dynamic_cast<VarDefAST*>(s->Def);
+					if (vd == 0) continue;
 					Value *v = vd->Val->Codegen();
-					Builder.CreateStore(v, pkg->VarDefs[i]->llvmVal);
+					Builder.CreateStore(v, s->llvmVal);
 				}
 			}
 
@@ -115,10 +121,10 @@ bool Generator::build(Package *pkg) {
 				}
 			}
 
-			f->dump();
+			DBGC(f->dump())
+
 			if (verifyFunction(*f)) {
 				fd->Val->error("Error in function '" + it->first + "'...");
-				fd->Val->prettyprint(cerr);
 			}
 			FPM.run(*f);
 		}
@@ -140,24 +146,23 @@ void Generator::init(Package *package) {
 	if (package->InitFunction == 0) return;
 
 	CallsInMain.push_back(package->InitFunction);
-
-	/*void *FPtr = ExecEng->getPointerToFunction(package->InitFunction);
-	void (*FP)() = (void (*)())(intptr_t)FPtr;
-	FP();*/
 }
 
-void Generator::main(Package *package) {
+// === Helper function for main ===
+bool Generator::main(Package *package) {
 	if (package->Complete == false) {
 		cerr << "Internal error." << endl;
-		return;
+		return false;
 	}
 
 	if (package->Symbols.count("_main") == 0) {
-		cerr << "Error : no _main function defined." << endl;
+		cerr << "Error : no _main function defined in '" << package->Name << "'." << endl;
+		return false;
 	}
 	Function *f = dyn_cast<Function>(package->Symbols["_main"]->llvmVal);
 	if (f == 0) {
-		cerr << "Error: invalid _main function." << endl;
+		cerr << "Error: invalid _main function in '" << package->Name << "'." << endl;
+		return false;
 	}
 
 	CallsInMain.push_back(f);
@@ -187,12 +192,19 @@ void Generator::main(Package *package) {
 		Builder.CreateRetVoid();
 	}
 
-	main_f->dump();
-	verifyFunction(*main_f);
+	DBGC(main_f->dump())
+
+	if (verifyFunction(*main_f)) {
+		cerr << "(INTERNAL ERROR) Incorrect main function..." << endl;
+		return false;
+	}
 	FPM.run(*main_f);
 
-
+	// Call that function
 	void *FPtr = ExecEng->getPointerToFunction(main_f);
 	void (*FP)() = (void (*)())(intptr_t)FPtr;
 	FP();
+
+	CallsInMain.clear();
+	return true;
 }

@@ -30,7 +30,7 @@ class Generator {
 
 	bool build(Package *package);
 	void init(Package *package);
-	void main(Package *package);
+	bool main(Package *package);
 };
 
 

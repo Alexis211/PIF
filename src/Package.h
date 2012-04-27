@@ -55,7 +55,7 @@ class Package {
 	friend class DotMemberExprAST;
 	friend class VarExprAST;
 	friend class PackageTypeAST;
-	friend int main();
+	friend int main(int argc, char *argv[]);
 
 	private:
 	PackageTypeAST *PkgType;
@@ -66,7 +66,7 @@ class Package {
 	std::map<std::string, Package*> Imports;
 	std::map<std::string, TypeAST*> Types;		//TODO: will be implemented later
 	std::map<std::string, Symbol*> Symbols;
-	std::vector<Symbol*> VarDefs;
+	std::vector<Symbol*> SymbolDefOrder;
 
 	llvm::Function *InitFunction;
 
@@ -83,6 +83,8 @@ class Package {
 	bool typeCheck();
 
 	bool import(ImportAST *def);
+
+	bool importAndRunMain(std::string pkg);
 };
 
 // extern std::map<std::string, Package*> Packages;

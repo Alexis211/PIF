@@ -25,7 +25,8 @@ bool Package::inputFile(string filename) {
 	ifstream file(filename.c_str(), ios::in);
 
 	if (file) {
-		cout << "Now parsing file : " << filename << endl;
+		DBGB(cout << "Now parsing file : " << filename << endl)
+
 		Lexer lex(filename, file);
 		Parser parser(lex);
 		while (1) {
@@ -45,15 +46,14 @@ bool Package::inputFile(string filename) {
 				if (d == 0) {
 					return false;
 				} else {
-					cerr << "def: " << d->Name << endl;
+					DBGP(cerr << "def: " << d->Name << endl)
+
 					if (Symbols.count(d->Name) == 0) {
 						Symbol *s = new Symbol(d);
 						s->SType = d->typeAtDef();
 						Symbols[d->Name] = s;
 
-						if (dynamic_cast<VarDefAST*>(d) != 0) {
-							VarDefs.push_back(s);
-						}
+						SymbolDefOrder.push_back(s);
 					} else {
 						std::cerr << d->Tag.str() << " Error: redefinition of symbol " << d->Name << endl;
 						return false;
@@ -92,7 +92,8 @@ bool Package::import(ImportAST *def) {
 		Package *pkg = new Package(Gen, package_name);
 
 		packages[package_name] = pkg;
-		cout << " - - - - importing " << package_name << " - - - - " << endl;
+
+		DBGB(cout << " - - - - importing " << package_name << " - - - - " << endl)
 
 		vector<string> files;
 		if (getdir(path + "/", files)) {
@@ -110,7 +111,7 @@ bool Package::import(ImportAST *def) {
 		}
 		// Create dummy init function if needed
 		if (pkg->Symbols.count("_init") == 0) {
-			pkg->Symbols["_init"] = new Symbol(
+			pkg->SymbolDefOrder.push_back( new Symbol(
 				new FuncDefAST(
 					FTag(),
 					"_init",
@@ -122,7 +123,8 @@ bool Package::import(ImportAST *def) {
 						) 
 					)
 				)
-			);
+			));
+			pkg->Symbols["_init"] = pkg->SymbolDefOrder.back();
 		}
 
 		if (!pkg->typeCheck() || !Gen->build(pkg)) {
@@ -131,7 +133,9 @@ bool Package::import(ImportAST *def) {
 		}
 		pkg->Complete = true;
 		Gen->init(pkg);
-		cout << " - - - - imported " << package_name << " - - - - " << endl;
+
+		DBGB(cout << " - - - - imported " << package_name << " - - - - " << endl)
+
 		Imports[def->As] = pkg;
 	}
 	return true;
@@ -139,26 +143,54 @@ bool Package::import(ImportAST *def) {
 
 // Check that everything is ok
 bool Package::typeCheck() {
-	for (unsigned i = 0; i < VarDefs.size(); i++) {
-		cerr << "typecheck: " << VarDefs[i]->Def->Name << endl;
-		if (!VarDefs[i]->Def->typeCheck(&Ctx)) {
-			cerr << VarDefs[i]->Def->Tag.str() << " Type error in definition of '" << VarDefs[i]->Def->Name << "'." << endl;
-			return false;
-		}
-		VarDefs[i]->SType = VarDefs[i]->Def->typeAtDef();
-	}
-	for (map<string, Symbol*>::iterator it = Symbols.begin(); it != Symbols.end(); it++) {
-		if (dynamic_cast<VarDefAST*>(it->second->Def) != 0) continue;
+	bool checkVar = true;
+	while (true) {
+		for (unsigned i = 0; i < SymbolDefOrder.size(); i++) {
+			if ((dynamic_cast<VarDefAST*>(SymbolDefOrder[i]->Def) != 0) != checkVar) continue;
 
-		cerr << "typecheck: " << it->first << endl;
-		if (!it->second->Def->typeCheck(&Ctx)) {
-			if (FuncDefAST* fd = dynamic_cast<FuncDefAST*>(it->second->Def)) {
-				fd->Val->prettyprint(cerr);
+			DBGP(cerr << "typecheck: " << SymbolDefOrder[i]->Def->Name << endl)
+
+			if (!SymbolDefOrder[i]->Def->typeCheck(&Ctx)) {
+				if (FuncDefAST* fd = dynamic_cast<FuncDefAST*>(SymbolDefOrder[i]->Def)) {
+					fd->Val->prettyprint(cerr);
+				}
+				cerr << SymbolDefOrder[i]->Def->Tag.str() <<
+					" Type error in definition of '" << SymbolDefOrder[i]->Def->Name << "'." << endl;
+				return false;
 			}
-			cerr << it->second->Def->Tag.str() << " Type error in definition of '" << it->first << "'." << endl;
-			return false;
+			SymbolDefOrder[i]->SType = SymbolDefOrder[i]->Def->typeAtDef();
 		}
-		it->second->SType = it->second->Def->typeAtDef();
+
+		if (checkVar) {
+			checkVar = false;
+		} else {
+			return true;
+		}
 	}
-	return true;
 }
+
+
+// === Helper function for main ===
+bool Package::importAndRunMain(string pkg) {
+	vector<string> path;
+	int j = 0;
+	for (unsigned i = 0; i < pkg.length(); i++) {
+		if (pkg[i] == '.') {
+			path.push_back(pkg.substr(j, i-j));
+			j = i + 1;
+		}
+	}
+	path.push_back(pkg.substr(j, pkg.length()-j));
+	string as = path.back();
+	while (Imports.count(as) > 0) {
+		as += "2";
+	}
+	if (!import(new ImportAST(FTag(), path, as))) return false;
+	if (Imports.count(as) > 0) {
+		return Gen->main(Imports[as]);
+	} else {
+		return false;
+	}
+}
+
+
