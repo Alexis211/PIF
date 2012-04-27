@@ -24,7 +24,6 @@ class TypeAST {
 	public:
 	virtual ~TypeAST() {}
 	virtual llvm::Type *getTy() = 0;
-	virtual bool eq(TypeAST *other);
 
 	virtual bool canDeref();
 	virtual std::string typeDescStr() = 0;

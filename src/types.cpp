@@ -62,12 +62,7 @@ std::string RefTypeAST::typeDescStr() {
 	return "&" + VType->typeDescStr();
 }
 
-// Check types are equivalent
-
-bool TypeAST::eq(TypeAST *other) {
-	return (this == other);
-}
-
+// Type dereferencing possibilities
 
 bool TypeAST::canDeref() {
 	return false;
@@ -96,11 +91,11 @@ ExprAST *ExprAST::asType(TypeAST *ty) {
 	if (this->Ctx == 0) return (ExprAST*) error(" (INTERNAL) Context not defined in ExprAST::asType.");
 
 	TypeAST *thisty = this->type(Ctx);
-	if (thisty->eq(ty)) return this;
+	if (thisty == ty) return this;
 
 	if (thisty->canDeref()) {
 		ExprAST *at = new DerefExprAST(Tag, this);
-		if (at->type(Ctx)->eq(ty)) return at;
+		if (at->type(Ctx) == ty) return at;
 		at = at->asType(ty);
 		if (at != 0) return at;
 	}
@@ -132,9 +127,9 @@ ExprAST *ExternAST::asType(TypeAST *ty) {
 
 	if (SType == 0) {
 		ExternAST *e = new ExternAST(Tag, rty->VType, Symbol);
-		if (!e->type(Ctx)->eq(ty)) return (ExprAST*) error("Internal error type.cpp#15523425");
+		if (e->type(Ctx) != ty) return (ExprAST*) error("Internal error type.cpp#15523425");
 		return e;
-	} else if (SType->eq(rty->VType)) {
+	} else if (SType == rty->VType) {
 		return this;
 	} else {
 		return 0;
@@ -195,13 +190,13 @@ TypeAST *UnaryExprAST::getType() {
 	if (inType == 0) return 0;
 
 	if (Op == "!") {
-		if (inType->eq(BOOLTYPE)) {
+		if (inType == BOOLTYPE) {
 			return inType;
 		} else {
 			return typeError(Tag, " Unary negation '!' only works with bools.");
 		}
 	} else if (Op == "-") {
-		if (inType->eq(FLOATTYPE)) return inType;
+		if (inType == FLOATTYPE) return inType;
 		if (dynamic_cast<IntTypeAST*>(inType) != 0) return inType;
 		return typeError(Tag, " Unary negation '-' only works with ints or floats.");
 	} else {
@@ -219,12 +214,12 @@ TypeAST *BinaryExprAST::getType() {
 		RefTypeAST *ltr = dynamic_cast<RefTypeAST*>(lt);
 		if (ltr == 0) return typeError(Tag, "Cannot affect to non-reference value.");
 
-		if (rt->eq(ltr->VType)) {
+		if (rt == ltr->VType) {
 			return rt;
 		} else {
 			RHS = RHS->asTypeOrError(ltr->VType);
 			if (RHS != 0) {
-				if (!ltr->VType->eq(RHS->type(Ctx))) return typeError(Tag, "Internal error 234666");
+				if (ltr->VType != RHS->type(Ctx)) return typeError(Tag, "Internal error 234666");
 				return RHS->type(Ctx);
 			} else {
 				return typeError(Tag, "Cannot affect '" + rt->typeDescStr() + "' to '" + lt->typeDescStr() + "'.");
@@ -269,7 +264,7 @@ TypeAST *BinaryExprAST::getType() {
 			}
 			if (retT == 0) retT = lf;
 		} else if (li != 0 && ri != 0) {
-			if (!li->eq(ri)) {
+			if (li != ri) {
 				if (li->Size >= ri->Size) {
 					if (ri->Signed) li->Signed = true;
 					RHS = new CastExprAST(Tag, RHS, li);
@@ -310,7 +305,7 @@ TypeAST *CastExprAST::getType() {
 	TypeAST *fromT = Expr->type(Ctx);
 	if (fromT == 0) return 0;
 
-	if (fromT->eq(FType)) {
+	if (fromT == FType) {
 		cout << Tag.str() << " Notice: unnecessary cast." << endl;
 		NeedCast = false;
 		return FType;
@@ -373,7 +368,7 @@ TypeAST *CallExprAST::getType() {
 		for (unsigned i = 0; i < Args.size(); i++) {
 			TypeAST *t = Args[i]->type(Ctx);
 			if (t == 0) return 0;
-			if (!t->eq(funct->Args[i]->ArgType)) {
+			if (t != funct->Args[i]->ArgType) {
 				Args[i] = Args[i]->asTypeOrError(funct->Args[i]->ArgType);
 				if (Args[i] == 0) {
 					return typeError(Tag, "Wrong type for argument " + funct->Args[i]->Name + ".");
@@ -390,19 +385,19 @@ TypeAST *CallExprAST::getType() {
 TypeAST *IfThenElseAST::getType() {
 	TypeAST *condType = Cond->type(Ctx);
 	if (condType == 0) return 0;
-	if (!condType->eq(BOOLTYPE)) return typeError(Tag, "Condition in 'if' must be boolean.");
+	if (condType != BOOLTYPE) return typeError(Tag, "Condition in 'if' must be boolean.");
 	
 	TypeAST *thenType = TrueBr->type(Ctx);
 	if (thenType == 0) return 0;
 	if (FalseBr == 0) {
-		if (!thenType->eq(VOIDTYPE)) return typeError(Tag, "Expression in 'then' must be void when no 'else'.");
+		if (thenType != VOIDTYPE) return typeError(Tag, "Expression in 'then' must be void when no 'else'.");
 		return thenType;
 	}
 
 	TypeAST *elseType = FalseBr->type(Ctx);
 	if (elseType == 0) return 0;
 
-	if (!thenType->eq(elseType)) {
+	if (thenType != elseType) {
 		FalseBr = FalseBr->asTypeOrError(thenType);
 		if (FalseBr == 0) {
 			return typeError(Tag, "Expression in 'then' and 'else' must be of same type.");
@@ -414,7 +409,7 @@ TypeAST *IfThenElseAST::getType() {
 TypeAST *WhileAST::getType() {
 	TypeAST *condType = Cond->type(Ctx);
 	if (condType == 0) return 0;
-	if (!condType->eq(BOOLTYPE)) return typeError(Tag, "Condition in while/until must be of type bool.");
+	if (condType != BOOLTYPE) return typeError(Tag, "Condition in while/until must be of type bool.");
 
 	TypeAST *contType = Inside->type(Ctx);
 	if (contType == 0) return 0;
@@ -459,12 +454,12 @@ TypeAST *ReturnAST::getType() {
 	if (Val != 0) {
 		TypeAST *exprT = Val->type(Ctx);
 		if (exprT == 0) return 0;
-		if (exprT->eq(retT)) {
+		if (exprT == retT) {
 			return VOIDTYPE;
 		} else {
 			Val = Val->asType(retT);
 			if (Val != 0) {
-				if (Val->type(Ctx)->eq(retT)) {
+				if (Val->type(Ctx) == retT) {
 					return VOIDTYPE;
 				} else {
 					return typeError(Tag, "Internal error #4525426");
@@ -472,7 +467,7 @@ TypeAST *ReturnAST::getType() {
 			}
 		}
 	} else {
-		if (retT->eq(VOIDTYPE)) {
+		if (retT == VOIDTYPE) {
 			return VOIDTYPE;
 		}
 	}
@@ -516,7 +511,7 @@ bool VarDefAST::typeCheck(Context *ctx) {
 	if (VType == 0) {
 		VType = t2;
 	} else {
-		if (!VType->eq(t2)) {
+		if (VType != t2) {
 			Val = Val->asTypeOrError(VType);
 			if (Val == 0) return false;
 		}

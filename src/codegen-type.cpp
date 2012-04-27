@@ -89,7 +89,7 @@ Type *RefTypeAST::getTy() {
 // Cast operations
 
 Value *TypeAST::castCodegen(llvm::Value *v, TypeAST *origType, Context *ctx) {
-	if (this->eq(origType)) return v;
+	if (this == origType) return v;
 	cerr << " (INTERNAL ERROR) Unimplemented cast from '" << origType->typeDescStr() << "' to '"
 		<< this->typeDescStr() << "'." << endl;
 	return 0;
