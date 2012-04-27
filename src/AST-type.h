@@ -24,7 +24,7 @@ class TypeAST {
 	public:
 	virtual ~TypeAST() {}
 	virtual llvm::Type *getTy() = 0;
-	virtual bool eq(TypeAST *other) = 0;
+	virtual bool eq(TypeAST *other);
 
 	virtual std::string typeDescStr() = 0;
 
@@ -40,8 +40,9 @@ class PackageTypeAST : public TypeAST {
 
 	PackageTypeAST (Package *pkg) : Pkg(pkg) {}
 	public:
+	static PackageTypeAST *Get(Package *pkg);
+
 	virtual llvm::Type *getTy();
-	virtual bool eq(TypeAST *other);
 	virtual std::string typeDescStr();
 };
 
@@ -58,15 +59,19 @@ class BaseTypeAST : public TypeAST {
 	friend class CastExprAST;
 
 	BaseTypeE BaseType;
-	public:
 	BaseTypeAST(BaseTypeE basetype) : BaseType(basetype) {}
+	public:
+	static BaseTypeAST* Get(BaseTypeE basetype);
+
 	virtual llvm::Type *getTy();
-	virtual bool eq(TypeAST *other);
 
 	virtual std::string typeDescStr();
 
 	virtual llvm::Value *castCodegen(llvm::Value *v, TypeAST *origType, Context *ctx);
 };
+#define VOIDTYPE (BaseTypeAST::Get(bt_void))
+#define BOOLTYPE (BaseTypeAST::Get(bt_bool))
+#define FLOATTYPE (BaseTypeAST::Get(bt_float))
 
 class IntTypeAST : public TypeAST {
 	friend class BaseTypeAST;
@@ -75,18 +80,19 @@ class IntTypeAST : public TypeAST {
 
 	short Size;
 	bool Signed;
-	public:
+
 	IntTypeAST(short size, bool sign) : Size(size), Signed(sign) {}
+	public:
+	static IntTypeAST *Get(short size, bool sign);
+
 	virtual llvm::Type *getTy();
-	virtual bool eq(TypeAST *other);
 
 	virtual std::string typeDescStr();
 
 	virtual llvm::Value *castCodegen(llvm::Value *v, TypeAST *origType, Context *ctx);
 };
+#define INTTYPE (IntTypeAST::Get(INTSIZE, true))
 
-extern BaseTypeAST voidBaseType, boolBaseType, floatBaseType;
-extern IntTypeAST u8iBaseType, s64iBaseType;
 
 // FuncArgAST - Class for function arguments in definitions
 class FuncArgAST {
@@ -133,9 +139,9 @@ class RefTypeAST : public TypeAST {
 
 	public:
 	static RefTypeAST *Get(TypeAST *type);
+	virtual bool eq(TypeAST *other);
 
 	virtual llvm::Type *getTy();
-	virtual bool eq(TypeAST *other);
 
 	virtual std::string typeDescStr();
 };

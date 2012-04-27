@@ -36,7 +36,9 @@ void BinaryExprAST::prettyprint(std::ostream &out) {
 }
 
 void DotMemberExprAST::prettyprint(std::ostream &out) {
-	out << "." << Member;
+	out << "(";
+	Obj->prettyprint(out);
+	out << ")." << Member;
 }
 
 void CastExprAST::prettyprint(std::ostream &out) {

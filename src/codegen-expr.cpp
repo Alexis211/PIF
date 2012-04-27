@@ -38,7 +38,7 @@ Value *UnaryExprAST::Codegen() {
 	Value *v = Expr->Codegen();
 
 	if (Op == "-") {
-		if (Expr->type(Ctx)->eq(&floatBaseType)) {
+		if (Expr->type(Ctx)->eq(FLOATTYPE)) {
 			return Ctx->Gen->Builder.CreateFNeg(v, "negtmp");
 		} else {
 			return Ctx->Gen->Builder.CreateNeg(v, "negtmp");

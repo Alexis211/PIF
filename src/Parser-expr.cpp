@@ -19,7 +19,7 @@ ExprAST *Parser::ParseBoolExpr() {
 
 // intexpr ::= int
 ExprAST *Parser::ParseIntExpr() {
-	ExprAST *result = new IntExprAST(Lex.tag(), Lex.tokInt, &s64iBaseType);
+	ExprAST *result = new IntExprAST(Lex.tag(), Lex.tokInt, INTTYPE);
 	Lex.gettok();
 	return result;
 }

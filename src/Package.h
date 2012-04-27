@@ -53,7 +53,6 @@ class Context {
 class Package {
 	friend class Generator;
 	friend class DotMemberExprAST;
-	friend class VarExprAST;
 	friend class PackageTypeAST;
 	friend int main(int argc, char *argv[]);
 
@@ -85,6 +84,8 @@ class Package {
 	bool import(ImportAST *def);
 
 	bool importAndRunMain(std::string pkg);
+
+	Package *getImport(std::string name);
 };
 
 // extern std::map<std::string, Package*> Packages;

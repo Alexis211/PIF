@@ -17,17 +17,18 @@ TypeAST *Parser::ParseType() {
 		return RefTypeAST::Get(t);
 	}
 	TypeAST *ret = 0;
-	if (Lex.tokStr == "void") ret = &voidBaseType;
-	if (Lex.tokStr == "bool") ret = &boolBaseType;
-	if (Lex.tokStr == "float") ret = &floatBaseType;
-	if (Lex.tokStr == "s64i" || Lex.tokStr == "int") ret = &s64iBaseType;
-	if (Lex.tokStr == "u8i" || Lex.tokStr == "byte") ret = &u8iBaseType;
-	if (Lex.tokStr == "u16i") ret = new IntTypeAST(16, false);
-	if (Lex.tokStr == "u32i") ret = new IntTypeAST(32, false);
-	if (Lex.tokStr == "u64i") ret = new IntTypeAST(64, false);
-	if (Lex.tokStr == "s8i") ret = new IntTypeAST(8, true);
-	if (Lex.tokStr == "s16i") ret = new IntTypeAST(16, true);
-	if (Lex.tokStr == "s32i") ret = new IntTypeAST(32, true);
+	if (Lex.tokStr == "void") ret = BaseTypeAST::Get(bt_void);
+	if (Lex.tokStr == "bool") ret = BaseTypeAST::Get(bt_bool);
+	if (Lex.tokStr == "float") ret = BaseTypeAST::Get(bt_float);
+	if (Lex.tokStr == "int") ret = INTTYPE;
+	if (Lex.tokStr == "s64i") ret = IntTypeAST::Get(64, true);
+	if (Lex.tokStr == "u8i" || Lex.tokStr == "byte") ret = IntTypeAST::Get(8, false);
+	if (Lex.tokStr == "u16i") ret = IntTypeAST::Get(16, false);
+	if (Lex.tokStr == "u32i") ret = IntTypeAST::Get(32, false);
+	if (Lex.tokStr == "u64i") ret = IntTypeAST::Get(64, false);
+	if (Lex.tokStr == "s8i") ret = IntTypeAST::Get(8, true);
+	if (Lex.tokStr == "s16i") ret = IntTypeAST::Get(16, true);
+	if (Lex.tokStr == "s32i") ret = IntTypeAST::Get(32, true);
 	if (ret != 0) {
 		Lex.gettok();
 		return ret;
@@ -73,7 +74,7 @@ FuncTypeAST *Parser::ParsePrototype() {
 	if (Lex.tokStr != "->") return (FuncTypeAST*) error("Invalid prototype : was expecting '->', not '" + Lex.tokStr + "'.");
 	Lex.gettok();	// eat '->'
 	if (Lex.tokStr == "{") {
-		return new FuncTypeAST(args, &voidBaseType);
+		return new FuncTypeAST(args, VOIDTYPE);
 	}
 	TypeAST *retType = ParseType();
 	if (retType == 0) return 0;

@@ -7,12 +7,33 @@ using namespace std;
 
 // Type manager
 
+PackageTypeAST *PackageTypeAST::Get(Package *pkg) {
+	return pkg->PkgType;
+}
+
 map<TypeAST*, RefTypeAST*> refTypes;
 RefTypeAST *RefTypeAST::Get(TypeAST *type) {
 	if (refTypes.count(type) == 0) {
 		refTypes[type] = new RefTypeAST(type);
 	}
 	return refTypes[type];
+}
+
+map<BaseTypeE, BaseTypeAST*> baseTypes;
+BaseTypeAST *BaseTypeAST::Get(BaseTypeE basetype) {
+	if (baseTypes.count(basetype) == 0) {
+		baseTypes[basetype] = new BaseTypeAST(basetype);
+	}
+	return baseTypes[basetype];
+}
+
+map<int, IntTypeAST*> intTypes;
+IntTypeAST *IntTypeAST::Get(short size, bool sign) {
+	int id = size * 2 + (sign ? 1 : 0);
+	if (intTypes.count(id) == 0) {
+		intTypes[id] = new IntTypeAST(size, sign);
+	}
+	return intTypes[id];
 }
 
 // Get LLVM type from TypeAST 

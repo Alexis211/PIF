@@ -4,13 +4,10 @@
 #include "Generator.h"
 #include "Package.h"
 
+#include "util.h"
+
 using namespace llvm;
 using namespace std;
-
-BaseTypeAST voidBaseType(bt_void), boolBaseType(bt_bool),
-		floatBaseType(bt_float);
-IntTypeAST u8iBaseType(8, false), s64iBaseType(64, true);
-
 
 
 TypeAST *typeError(const FTag &tag, const string &msg) {
@@ -67,27 +64,15 @@ std::string RefTypeAST::typeDescStr() {
 
 // Check types are equivalent
 
-bool PackageTypeAST::eq(TypeAST *other) {
+bool TypeAST::eq(TypeAST *other) {
 	return (this == other);
-}
-
-bool BaseTypeAST::eq(TypeAST *other) {
-	BaseTypeAST *bt = dynamic_cast<BaseTypeAST*>(other);
-	if (bt != 0)
-		return bt->BaseType == BaseType;
-	return false;
-}
-
-bool IntTypeAST::eq(TypeAST *other) {
-	IntTypeAST *it = dynamic_cast<IntTypeAST*>(other);
-	if (it != 0)
-		return it->Size == Size && it->Signed == Signed;
-	return false;
 }
 
 bool FuncTypeAST::eq(TypeAST *other) {
 	FuncTypeAST *ft = dynamic_cast<FuncTypeAST*>(other);
 	if (ft == 0) return false;
+	if (ft == this) return true;
+
 	if (!ft->ReturnType->eq(ReturnType)) return false;
 	if (Args.size() != ft->Args.size()) return false;
 	for (unsigned i = 0; i < Args.size(); i++) {
@@ -98,7 +83,7 @@ bool FuncTypeAST::eq(TypeAST *other) {
 
 bool RefTypeAST::eq(TypeAST *other) {
 	if (this == other) return true;
-	
+
 	RefTypeAST *o = dynamic_cast<RefTypeAST*>(other);
 	if (o == 0) return false;
 	return VType->eq(o->VType);
@@ -176,11 +161,11 @@ TypeAST* IntExprAST::getType() {
 }
 
 TypeAST* BoolExprAST::getType() {
-	return &boolBaseType;
+	return BOOLTYPE;
 }
 
 TypeAST *FloatExprAST::getType() {
-	return &floatBaseType;
+	return FLOATTYPE;
 }
 
 TypeAST *VarExprAST::getType() {
@@ -198,8 +183,9 @@ TypeAST *VarExprAST::getType() {
 			return Sym->SType;
 		}
 	}
-	if (Ctx->Pkg->Imports.count(Name) > 0) {
-		return Ctx->Pkg->Imports[Name]->PkgType;
+	Package *import = Ctx->Pkg->getImport(Name);
+	if (import != 0) {
+		return PackageTypeAST::Get(import);
 	}
 	return typeError(Tag, " Variable '" + Name + "' not found.");
 }
@@ -222,13 +208,13 @@ TypeAST *UnaryExprAST::getType() {
 	if (inType == 0) return 0;
 
 	if (Op == "!") {
-		if (inType->eq(&boolBaseType)) {
+		if (inType->eq(BOOLTYPE)) {
 			return inType;
 		} else {
 			return typeError(Tag, " Unary negation '!' only works with bools.");
 		}
 	} else if (Op == "-") {
-		if (inType->eq(&floatBaseType)) return inType;
+		if (inType->eq(FLOATTYPE)) return inType;
 		if (dynamic_cast<IntTypeAST*>(inType) != 0) return inType;
 		return typeError(Tag, " Unary negation '-' only works with ints or floats.");
 	} else {
@@ -262,7 +248,7 @@ TypeAST *BinaryExprAST::getType() {
 			Op == "<" || Op == ">" || Op == "==" || Op == "!=" || Op == "<=" || Op == ">=") {
 
 		bool retBool = (Op == "<" || Op == ">" || Op == "==" || Op == "!=" || Op == "<=" || Op == ">=");
-		TypeAST *retT = (retBool ? &boolBaseType : 0);
+		TypeAST *retT = (retBool ? BOOLTYPE : 0);
 
 		TypeAST *lt = LHS->type(Ctx);
 		while (lt != 0 && dynamic_cast<RefTypeAST*>(lt) != 0) {
@@ -417,12 +403,12 @@ TypeAST *CallExprAST::getType() {
 TypeAST *IfThenElseAST::getType() {
 	TypeAST *condType = Cond->type(Ctx);
 	if (condType == 0) return 0;
-	if (!condType->eq(&boolBaseType)) return typeError(Tag, "Condition in 'if' must be boolean.");
+	if (!condType->eq(BOOLTYPE)) return typeError(Tag, "Condition in 'if' must be boolean.");
 	
 	TypeAST *thenType = TrueBr->type(Ctx);
 	if (thenType == 0) return 0;
 	if (FalseBr == 0) {
-		if (!thenType->eq(&voidBaseType)) return typeError(Tag, "Expression in 'then' must be void when no 'else'.");
+		if (!thenType->eq(VOIDTYPE)) return typeError(Tag, "Expression in 'then' must be void when no 'else'.");
 		return thenType;
 	}
 
@@ -441,17 +427,17 @@ TypeAST *IfThenElseAST::getType() {
 TypeAST *WhileAST::getType() {
 	TypeAST *condType = Cond->type(Ctx);
 	if (condType == 0) return 0;
-	if (!condType->eq(&boolBaseType)) return typeError(Tag, "Condition in while/until must be of type bool.");
+	if (!condType->eq(BOOLTYPE)) return typeError(Tag, "Condition in while/until must be of type bool.");
 
 	TypeAST *contType = Inside->type(Ctx);
 	if (contType == 0) return 0;
 
-	return &voidBaseType;
+	return VOIDTYPE;
 }
 
 TypeAST *BreakContAST::getType() {
 	// OOH THIS TIME WE HAVE NOTHING TO DO !! THAT'S GOOD !!
-	return &voidBaseType;
+	return VOIDTYPE;
 }
 
 TypeAST *BlockAST::getType() {
@@ -478,7 +464,7 @@ TypeAST *BlockAST::getType() {
 		}
 	}
 	OwnContext = true;
-	return &voidBaseType;
+	return VOIDTYPE;
 }
 
 TypeAST *ReturnAST::getType() {
@@ -487,27 +473,27 @@ TypeAST *ReturnAST::getType() {
 		TypeAST *exprT = Val->type(Ctx);
 		if (exprT == 0) return 0;
 		if (exprT->eq(retT)) {
-			return &voidBaseType;
+			return VOIDTYPE;
 		} else {
 			Val = Val->asType(retT);
 			if (Val != 0) {
 				if (Val->type(Ctx)->eq(retT)) {
-					return &voidBaseType;
+					return VOIDTYPE;
 				} else {
 					return typeError(Tag, "Internal error #4525426");
 				}
 			}
 		}
 	} else {
-		if (retT->eq(&voidBaseType)) {
-			return &voidBaseType;
+		if (retT->eq(VOIDTYPE)) {
+			return VOIDTYPE;
 		}
 	}
 	return typeError(Tag, "Return statement does not return correct type value.");
 }
 
 TypeAST *ExternAST::getType() {
-	if (SType == 0) return &voidBaseType;
+	if (SType == 0) return VOIDTYPE;
 	return RefTypeAST::Get(SType);
 }
 
@@ -533,6 +519,8 @@ TypeAST *FuncExprAST::getType() {
 // ============= Type checking in definitions ==========
 
 bool VarDefAST::typeCheck(Context *ctx) {
+	DBGC(cerr << "TC:\t"; Val->prettyprint(cerr); cerr << endl);
+
 	TypeAST* t2 = Val->type(ctx);
 	if (t2 == 0) {
 		cerr << Tag.str() << " Cannot determine type of value for '" << Name << "'." << endl;
@@ -550,10 +538,14 @@ bool VarDefAST::typeCheck(Context *ctx) {
 }
 
 bool FuncDefAST::typeCheck(Context *ctx) {
+	DBGC(cerr << "TC:\t"; Val->prettyprint(cerr); cerr << endl);
+
 	return Val->type(ctx) != 0;
 }
 
 bool ExternFuncDefAST::typeCheck(Context *ctx) {
+	DBGC(cerr << "TC:\t"; Val->prettyprint(cerr); cerr << endl);
+
 	if (EType == 0) return false;
 	if (Val->type(ctx) == 0) return false;
 	Val = dynamic_cast<ExternAST*>(Val->asTypeOrError(RefTypeAST::Get(EType)));

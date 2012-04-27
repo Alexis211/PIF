@@ -12,6 +12,15 @@ using namespace std;
 
 map<string, Package*> packages;
 
+// Accessors
+
+Package *Package::getImport(string name) {
+	if (Imports.count(name) > 0) return Imports[name];
+	return 0;
+}
+
+//Stuff
+
 Package::Package(Generator *gen, string name) : Gen(gen), Ctx(this, gen) {
 	Name = name;
 	SymbolPrefix = "PIF_" + name + ".";
@@ -117,7 +126,7 @@ bool Package::import(ImportAST *def) {
 					"_init",
 					new FuncExprAST(
 						FTag(),
-						new FuncTypeAST(vector<FuncArgAST*>(), &voidBaseType),
+						new FuncTypeAST(vector<FuncArgAST*>(), BaseTypeAST::Get(bt_void)),
 						new BlockAST(FTag(), vector<StmtAST*>(1, 
 							new ExprStmtAST(FTag(), new ReturnAST(FTag(), 0)))
 						) 
