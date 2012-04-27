@@ -1,0 +1,19 @@
+
+func integrate : (f : &(x : float) -> float, x0 : float, x1 : float, n : int) -> float {
+	## Calcul approché d'une intégrale par la méthode des trapèzes
+
+	if x1 == x0 return 0
+
+	let dx = (x1 - x0) / (n : float)
+
+	var sum : float = 0
+	var i = 0
+	while i < n {
+		let x = x0 + (i : float * dx)
+		sum = sum + (f(x) + f(x + dx)) / 2 * dx
+		i = i + 1
+	}
+	return sum
+}
+
+

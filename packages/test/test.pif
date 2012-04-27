@@ -1,0 +1,109 @@
+# Test program - one of the first programs to ever be run by PIF
+# copyright adnab.fr.nf
+
+import pif.math
+import pif.util
+
+func print_more_stuff : () -> {
+	var xi = math.pi / math.tau
+
+	util.print_float(math.pi)
+	util.print_float(math.tau)
+	util.print_float(xi)
+	util.print_nl()
+}
+
+func print_some_sinuses : () -> {
+	let pids = math.pi / 6
+
+	let sin2 : &(x : float) -> float = extern sin
+	let sin3 = math.sin
+	var sin4 : &(x : float) -> float = math.cos
+	sin4 = extern sin
+	var sin5 = extern sin : &(x : float) -> float
+
+	util.print_float(math.sin(pids))
+	util.print_float(sin2(pids))
+	util.print_float(sin3(pids))
+	util.print_float(@sin4(pids))
+	util.print_float(@sin5(pids))
+	util.print_float(getval(@sin5, pids))
+	util.print_float(getval(sin3, pids))
+
+	util.print_nl()
+}
+
+func getval : (f : &(a : float) -> float, x : float) -> float {
+	return f(x)
+}
+
+func test_while : () -> float {
+	var a = 42
+	var b : float = 0
+	until a == 0 {
+		util.print_int(a)
+		b = b + (extern sqrt : &(x : float) -> float)(a : float)
+		a = a - 1
+	}
+	util.print_nl()
+	return b
+}
+
+func _main : () -> {
+	print_some_sinuses()
+
+	let some_total = test_while()
+	util.print_int(42)
+	util.print_float(some_total)
+	util.print_float(-math.abs(math.tan(42)))
+
+
+	util.print_float(math.integrate(math.sin, 0, math.pi, 1000))
+	util.print_float(math.integrate(math.sin, math.pi, 0, 1000))
+	util.print_float(math.integrate(extern cos, 0, math.pi, 1000))
+	
+	util.print_nl()
+
+	print_more_stuff()
+
+	find_primes(42 * 12)
+
+	test_fibo()
+}
+
+func find_primes : (max : int) -> {
+	var i = 1
+	while i < max {
+		i = i + 1
+		if !math.is_prime(i) continue
+		util.print_int(i)
+	}
+	util.print_nl()
+}
+
+func test_fibo : () -> {
+	let max = 30
+	var i = 1
+	while i < max {
+		util.print_int(fibo_pas_cool(i))
+		i = i + 1
+	}
+	util.print_nl()
+	i = 1
+	while i < max * 2 {
+		util.print_int(fibo_mieux(1, 1, i))
+		i = i + 1
+	}
+	util.print_nl()
+}
+
+func fibo_pas_cool : (n : int) -> int {
+	if n <= 1 return 1
+	return fibo_pas_cool(n-1) + fibo_pas_cool(n-2)
+}
+
+func fibo_mieux : (u0 : int, u1 : int, n : int) -> int {
+	if n == 0 return u0
+	return fibo_mieux(u1, u0 + u1, n-1)
+}
+

@@ -1,0 +1,6 @@
+pifc
+*.notready
+*.o
+*.swp
+dump.llvm
+

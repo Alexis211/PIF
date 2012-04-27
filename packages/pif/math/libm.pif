@@ -1,0 +1,28 @@
+# Hello, world
+# This is the first PIF code that will ever be read !
+# Or so I think.
+
+let pi = 3.14159265
+let tau = pi * 2
+
+func sqrt : (x : float) -> float
+	extern sqrt
+
+func abs : (a : float) -> float {
+	if a < 0
+		return -a
+	else
+		return a
+}
+
+func cos : (x : float) -> float
+	extern cos
+func sin : (x : float) -> float
+	extern sin
+func tan : (x : float) -> float
+	extern tan
+
+func cotan : (x : float) -> float {
+	return 1 / tan(x)
+}
+

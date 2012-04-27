@@ -1,0 +1,8 @@
+
+func print_int : (val : int) -> void
+	extern print_int
+func print_float : (val : float) -> void
+	extern print_float
+func print_nl : () -> void
+	extern print_nl
+

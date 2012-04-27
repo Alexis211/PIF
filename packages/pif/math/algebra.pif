@@ -1,0 +1,11 @@
+
+
+func is_prime : (num : int) -> bool {
+	var d = 2
+	while d*d <= num {
+		if num % d == 0 return false
+		d = d + 1
+	}
+	return true
+}
+
