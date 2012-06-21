@@ -1,0 +1,12 @@
+func print_int : (x : int) -> void
+	extern print_int
+
+func main : () -> {
+	print_int(42)
+	let x = 3
+	# let y = x * 3.4
+	let y = (x : float) * 3.4
+	let a = true
+	let b = false
+	let c = a * b
+}

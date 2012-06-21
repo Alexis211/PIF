@@ -1,9 +1,9 @@
 #ifndef DEF_AST_H
 #define DEF_AST_H
 
-#include "config.h"
+#include "../config.h"
 
-#include "Lexer.h"
+#include "../lexer/Lexer.h"
 
 #include <string>
 #include <map>
@@ -11,7 +11,7 @@
 #include <iostream>
 
 
-#include "AST-type.h"
+#include "type.h"
 
 class Context;
 
@@ -36,8 +36,6 @@ class ExprAST {
 	virtual void prettyprint(std::ostream &out) = 0;
 
 	const FTag Tag;
-
-	void* error(const std::string &msg);
 
 	ExprAST* cannotConvert(TypeAST *t);
 };

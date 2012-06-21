@@ -1,5 +1,6 @@
 #include "Generator.h"
-#include "util.h"
+#include "../util.h"
+#include "../error.h"
 
 using namespace llvm;
 using namespace std;
@@ -23,7 +24,7 @@ Generator::Generator() :
 	FPM.doInitialization();
 }
 
-bool Generator::build(Package *pkg) {
+void Generator::build(Package *pkg) {
 	/*cerr << "GENERATOR SAYS: Wait a minute. This isn't ready yet." << endl;
 	return false;*/
 
@@ -49,14 +50,12 @@ bool Generator::build(Package *pkg) {
 			string sym_name = prefix + fd->Name;
 			FunctionType *ft = dyn_cast<FunctionType>(fd->Val->FType->getTy());
 			if (ft == 0) {
-				cerr << d->Tag.str() << " Error: function does not have function type." << endl;
-				return false;
+				d->Tag.Throw(" Error: function does not have function type.");
 			}
 			Function *f = Function::Create(ft, Function::ExternalLinkage, sym_name, TheModule);
 
 			if (f->getName() != sym_name) {
-				cerr << d->Tag.str() << " Error: Redefinition of function " << fd->Name << endl;
-				return false;
+				d->Tag.Throw(" Error: Redefinition of function " + fd->Name);
 			}
 
 			// set names for arguments
@@ -79,8 +78,7 @@ bool Generator::build(Package *pkg) {
 			string sym_name = pkg->SymbolPrefix + fd->Name;
 			Function *f = TheModule->getFunction(sym_name);
 			if (f != it->second->llvmVal) {
-				cerr << d->Tag.str() << " Internal error n°RN#45556, sorry." << endl;
-				return false;
+				d->Tag.Throw(" Internal error n°RN#45556, sorry.");
 			}
 
 			Context *fctx = fd->Val->Ctx;
@@ -89,7 +87,7 @@ bool Generator::build(Package *pkg) {
 			for (Function::arg_iterator ai = f->arg_begin(); i != fd->Val->FType->Args.size(); i++, ai++) {
 				auto s = fctx->NamedValues.back()->find(fd->Val->FType->Args[i]->Name);
 				if (s == fctx->NamedValues.back()->end()) {
-					cerr << " (INTERNAL ERROR) Function argument name mismatch." << endl;
+					throw new InternalError("Function argument name mismatch.");
 				} else {
 					s->second->llvmVal = ai;
 				}
@@ -116,32 +114,27 @@ bool Generator::build(Package *pkg) {
 				if (f->getReturnType() == Type::getVoidTy(getGlobalContext())) {
 					Builder.CreateRetVoid();
 				} else {
-					fd->Val->error("Function '" + it->first + "' lacks a return statement.");
-					return false;
+					fd->Val->Tag.Throw("Function '" + it->first + "' lacks a return statement.");
 				}
 			}
 
 			DBGC(f->dump())
 
 			if (verifyFunction(*f)) {
-				fd->Val->error("Error in function '" + it->first + "'...");
+				fd->Val->Tag.Throw("Error in function '" + it->first + "'...");
 			}
 			FPM.run(*f);
 		}
 	}
 
 	if (pkg->InitFunction == 0) {
-		cerr << "Internal error #1512351, sorry." << endl;
-		return false;
+		throw new InternalError("Internal error #1512351, sorry.");
 	}
-
-	return true;
 }
 
 void Generator::init(Package *package) {
 	if (package->Complete == false) {
-		cerr << "Internal error." << endl;
-		return;
+		throw new InternalError("Internal error #1513542, sorry.");
 	}
 	if (package->InitFunction == 0) return;
 
@@ -149,20 +142,17 @@ void Generator::init(Package *package) {
 }
 
 // === Helper function for main ===
-bool Generator::main(Package *package) {
+void Generator::main(Package *package) {
 	if (package->Complete == false) {
-		cerr << "Internal error." << endl;
-		return false;
+		throw new InternalError("Internal error #2652462, sorry.");
 	}
 
 	if (package->Symbols.count("_main") == 0) {
-		cerr << "Error : no _main function defined in '" << package->Name << "'." << endl;
-		return false;
+		throw new PIFError("no _main function defined in '" + package->Name + "'.");
 	}
 	Function *f = dyn_cast<Function>(package->Symbols["_main"]->llvmVal);
 	if (f == 0) {
-		cerr << "Error: invalid _main function in '" << package->Name << "'." << endl;
-		return false;
+		throw new PIFError("invalid _main function in '" + package->Name + "'.");
 	}
 
 	CallsInMain.push_back(f);
@@ -171,7 +161,7 @@ bool Generator::main(Package *package) {
 	FunctionType *main_ft = FunctionType::get(f->getReturnType(), _args, false);
 	Function *main_f = Function::Create(main_ft, Function::ExternalLinkage, "main", TheModule);
 	if (main_f->getName() != "main") {
-		cerr << "(INTERNAL ERROR?) Something is probably wrong with main function, sorry." << endl;
+		throw new InternalError("Something is probably wrong with main function, sorry.");
 	}
 	
 	Value *retval;
@@ -195,8 +185,7 @@ bool Generator::main(Package *package) {
 	DBGC(main_f->dump())
 
 	if (verifyFunction(*main_f)) {
-		cerr << "(INTERNAL ERROR) Incorrect main function..." << endl;
-		return false;
+		throw new InternalError("Incorrect main function...");
 	}
 	FPM.run(*main_f);
 
@@ -206,5 +195,4 @@ bool Generator::main(Package *package) {
 	FP();
 
 	CallsInMain.clear();
-	return true;
 }

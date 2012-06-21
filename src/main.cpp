@@ -6,8 +6,10 @@
 
 #include <llvm/Support/raw_ostream.h>
 
-#include "Generator.h"
+#include "codegen-llvm/Generator.h"
+
 #include "util.h"
+#include "error.h"
 
 using namespace std;
 
@@ -45,11 +47,13 @@ int main(int argc, char *argv[]) {
 		cout << "\t\t\tSee source in config.h for detailed info about debug level." << endl;
 		cout << endl;
 	} else {
-		for (unsigned i = 0; i < pkgs.size(); i++) {
-			if (!pkg->importAndRunMain(pkgs[i])) {
-				cerr << "KYAAAA ! IT DIDN'T COMPILE !!" << endl;
-				break;
+		try {
+			for (unsigned i = 0; i < pkgs.size(); i++) {
+				pkg->importAndRunMain(pkgs[i]);
 			}
+		} catch (PIFError *e) {
+			e->disp();
+			cerr << "KYAAAA ! IT DIDN'T COMPILE !!" << endl;
 		}
 	}
 

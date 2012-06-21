@@ -1,16 +1,15 @@
 #ifndef DEF_AST_STMT_H
 #define DEF_AST_STMT_H
 
-#include "config.h"
-
-#include "Lexer.h"
+#include "../config.h"
+#include "../lexer/Lexer.h"
 
 #include <string>
 #include <map>
 #include <vector>
 #include <iostream>
 
-#include "AST-expr.h"
+#include "expr.h"
 
 class StmtAST {
 	friend class Package;
@@ -21,7 +20,7 @@ class StmtAST {
 
 	const FTag Tag;
 
-	virtual bool typeCheck(Context *ctx) { return true; };
+	virtual void typeCheck(Context *ctx) {};
 };
 
 // ExprStmtAST - Class for statements made of expressions
@@ -35,7 +34,7 @@ class ExprStmtAST : public StmtAST {
 	ExprStmtAST(const FTag &tag, ExprAST *expr) : StmtAST(tag), Expr(expr) {}
 	virtual ~ExprStmtAST() {}
 
-	virtual bool typeCheck(Context *ctx);
+	virtual void typeCheck(Context *ctx);
 };
 
 // ImportAST - Class for import statements
@@ -83,7 +82,7 @@ class VarDefAST  : public DefAST {
 		DefAST(name, tag),
 		VType(type), Val(value), Var(var) {}
 
-	virtual bool typeCheck(Context *ctx);
+	virtual void typeCheck(Context *ctx);
 	virtual TypeAST* typeAtDef();
 };
 
@@ -102,7 +101,7 @@ class FuncDefAST : public DefAST {
 		DefAST(name, tag), 
 		Val(val) {}
 
-	virtual bool typeCheck(Context *ctx);
+	virtual void typeCheck(Context *ctx);
 	virtual TypeAST* typeAtDef();
 };
 
@@ -122,7 +121,7 @@ class ExternFuncDefAST : public DefAST {
 		DefAST(name, tag), 
 		Val(val), EType(type) {}
 
-	virtual bool typeCheck(Context *ctx);
+	virtual void typeCheck(Context *ctx);
 	virtual TypeAST* typeAtDef();
 };
 

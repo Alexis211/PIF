@@ -1,28 +1,22 @@
 #include <sstream>
 
-#include "AST-stmt.h"
-#include "Generator.h"
-#include "Package.h"
+#include "../ast/stmt.h"
+#include "../Package.h"
 
-#include "util.h"
+#include "../util.h"
+#include "../error.h"
 
 using namespace llvm;
 using namespace std;
 
 
-TypeAST *typeError(const FTag &tag, const string &msg) {
-	cout << tag.str() << " Type Error: " << msg << endl;
-	return 0;
-}
-
-
 
 TypeAST *ExprAST::type(Context *ctx) {
-	if (ctx == 0) return (TypeAST*)error(" (INTERNAL ERROR) ExprAST::type called with no context.");
+	if (ctx == 0) throw new InternalError("ExprAST::type called with no context.");
 
 	if (Ctx == 0) Ctx = ctx;
 	if (EType == NULL) {
-		if (dep_loop) return typeError(Tag, " Expression dependency loop. That's bad, you know.");
+		if (dep_loop) Tag.Throw("Type error: expression dependency loop. That's bad, you know.");
 		dep_loop = true;
 		EType = this->getType();
 	}
@@ -81,14 +75,14 @@ ExprAST *ExprAST::asTypeOrError(TypeAST *ty) {
 			return e;
 		}
 	}
-	cout << Tag.str() << " Type error: cannot use value of type '" << (EType != 0 ? EType->typeDescStr() : "???")
-		<< "' as type '" << ty->typeDescStr() << "'." << endl;
+	Tag.Throw("Type error: cannot use value of type '" + (EType != 0 ? EType->typeDescStr() : "???")
+		+ "' as type '" + ty->typeDescStr());
 	return 0;
 }
 
 ExprAST *ExprAST::asType(TypeAST *ty) {
 	if (this == 0) return 0;
-	if (this->Ctx == 0) return (ExprAST*) error(" (INTERNAL) Context not defined in ExprAST::asType.");
+	if (this->Ctx == 0) throw new InternalError("Context not defined in ExprAST::asType.");
 
 	TypeAST *thisty = this->type(Ctx);
 	if (thisty == ty) return this;
@@ -104,7 +98,7 @@ ExprAST *ExprAST::asType(TypeAST *ty) {
 }
 
 ExprAST *IntExprAST::asType(TypeAST *ty) {
-	if (this->Ctx == 0) return (ExprAST*) error(" (INTERNAL) Context not defined in IntExprAST::asType.");
+	if (this->Ctx == 0) throw new InternalError("Context not defined in IntExprAST::asType.");
 
 	IntTypeAST *tyi = dynamic_cast<IntTypeAST*>(ty);
 	if (tyi != 0) {
@@ -120,14 +114,14 @@ ExprAST *IntExprAST::asType(TypeAST *ty) {
 }
 
 ExprAST *ExternAST::asType(TypeAST *ty) {
-	if (this->Ctx == 0) return (ExprAST*) error(" (INTERNAL) Context not defined in ExternAST::asType.");
+	if (this->Ctx == 0) throw new InternalError("Context not defined in ExternAST::asType.");
 
 	RefTypeAST *rty = dynamic_cast<RefTypeAST*>(ty);
-	if (rty == 0) return (ExprAST*) error(" Extern values must be of reference type.");
+	if (rty == 0) throw new InternalError("Extern values must be of reference type.");
 
 	if (SType == 0) {
 		ExternAST *e = new ExternAST(Tag, rty->VType, Symbol);
-		if (e->type(Ctx) != ty) return (ExprAST*) error("Internal error type.cpp#15523425");
+		if (e->type(Ctx) != ty) throw new InternalError("Internal error type.cpp#15523425");
 		return e;
 	} else if (SType == rty->VType) {
 		return this;
@@ -155,7 +149,7 @@ TypeAST *VarExprAST::getType() {
 		if (Ctx->NamedValues[i]->count(Name) != 0) {
 			Sym = Ctx->NamedValues[i]->find(Name)->second;
 			if (Sym->SType == 0) {
-				return typeError(Tag, " Variable '" + Name + "' cannot be used here.");
+				Tag.Throw("Scope error: variable '" + Name + "' cannot be used here.");
 			}
 			if (i == 0) {
 				if (VarDefAST *d = dynamic_cast<VarDefAST*>(Sym->Def)) {
@@ -169,7 +163,8 @@ TypeAST *VarExprAST::getType() {
 	if (import != 0) {
 		return PackageTypeAST::Get(import);
 	}
-	return typeError(Tag, " Variable '" + Name + "' not found.");
+	Tag.Throw("Scope error: variable '" + Name + "' not found.");
+	return 0;
 }
 
 TypeAST *DerefExprAST::getType() {
@@ -177,10 +172,10 @@ TypeAST *DerefExprAST::getType() {
 	if (t == 0) return 0;
 	RefTypeAST *rt = dynamic_cast<RefTypeAST*>(t);
 	if (rt == 0) {
-		return typeError(Tag, " Dereferencing something that was not a reference...");
+		Tag.Throw("Dereferencing something that was not a reference...");
 	}
 	if (dynamic_cast<FuncTypeAST*>(rt->VType) != 0) {
-		return typeError(Tag, " Cannot dereference a function pointer. You call it as-is.");
+		Tag.Throw("Cannot dereference a function pointer. You call it as-is.");
 	}
 	return rt->VType;
 }
@@ -193,15 +188,16 @@ TypeAST *UnaryExprAST::getType() {
 		if (inType == BOOLTYPE) {
 			return inType;
 		} else {
-			return typeError(Tag, " Unary negation '!' only works with bools.");
+			Tag.Throw("Unary negation '!' only works with bools.");
 		}
 	} else if (Op == "-") {
 		if (inType == FLOATTYPE) return inType;
 		if (dynamic_cast<IntTypeAST*>(inType) != 0) return inType;
-		return typeError(Tag, " Unary negation '-' only works with ints or floats.");
+		Tag.Throw("Unary negation '-' only works with ints or floats.");
 	} else {
-		return typeError(Tag, " Unknown unary operator '" + Op + "'.");
+		Tag.Throw("Unknown unary operator '" + Op + "'.");
 	}
+	return 0;
 }
 
 TypeAST *BinaryExprAST::getType() {
@@ -212,17 +208,17 @@ TypeAST *BinaryExprAST::getType() {
 		if (rt == 0) return 0;
 
 		RefTypeAST *ltr = dynamic_cast<RefTypeAST*>(lt);
-		if (ltr == 0) return typeError(Tag, "Cannot affect to non-reference value.");
+		if (ltr == 0) Tag.Throw("Cannot affect to non-reference value.");
 
 		if (rt == ltr->VType) {
 			return rt;
 		} else {
 			RHS = RHS->asTypeOrError(ltr->VType);
 			if (RHS != 0) {
-				if (ltr->VType != RHS->type(Ctx)) return typeError(Tag, "Internal error 234666");
+				if (ltr->VType != RHS->type(Ctx)) Tag.Throw("Internal error 234666");
 				return RHS->type(Ctx);
 			} else {
-				return typeError(Tag, "Cannot affect '" + rt->typeDescStr() + "' to '" + lt->typeDescStr() + "'.");
+				Tag.Throw("Cannot affect '" + rt->typeDescStr() + "' to '" + lt->typeDescStr() + "'.");
 			}
 		}
 
@@ -255,12 +251,12 @@ TypeAST *BinaryExprAST::getType() {
 		if ((lf != 0 && rf != 0) || (lf != 0 && ri != 0) || (li != 0 && rf != 0)) {
 			if (lf == 0) {
 				LHS = LHS->asTypeOrError(rf);
-				if (LHS == 0) return typeError(Tag, " cannot compute '" + Op + "' operation (LHS to float fail).");
+				if (LHS == 0) Tag.Throw("cannot compute '" + Op + "' operation (LHS to float fail).");
 				lf = rf;
 			}
 			if (rf == 0) {
 				RHS = RHS->asTypeOrError(lf);
-				if (RHS == 0) return typeError(Tag, " cannot compute '" + Op + "' operation (RHS to float fail).");
+				if (RHS == 0) Tag.Throw("cannot compute '" + Op + "' operation (RHS to float fail).");
 			}
 			if (retT == 0) retT = lf;
 		} else if (li != 0 && ri != 0) {
@@ -278,11 +274,11 @@ TypeAST *BinaryExprAST::getType() {
 				if (retT == 0) retT = li;
 			}
 		} else {
-			return typeError(Tag, " operator '" + Op + "' only defined on integers and floats.");
+			Tag.Throw("Operator '" + Op + "' only defined on integers and floats.");
 		}
 		return retT;
 	} else {
-		return typeError(Tag, " unknown or unimplemented operator '" + Op + "'.");
+		Tag.Throw("Unknown or unimplemented operator '" + Op + "'.");
 	}
 }
 
@@ -293,11 +289,11 @@ TypeAST *DotMemberExprAST::getType() {
 		Obj = new VarExprAST(Tag, Member);
 		TypeAST *retType = (Obj->type(&pt->Pkg->Ctx));
 		if (retType == 0)
-			return typeError(Tag, " no such member '" + Member + "' in package '" + pt->Pkg->Name + "'.");
+			Tag.Throw( "no such member '" + Member + "' in package '" + pt->Pkg->Name + "'.");
 		Member = "";
 		return retType;
 	} else {
-		return typeError(Tag, " accessing a member using '.' is only possible with packages.");
+		Tag.Throw("accessing a member using '.' is only possible with packages.");
 	}
 }
 
@@ -337,7 +333,7 @@ TypeAST *CastExprAST::getType() {
 			Expr = new DerefExprAST(Tag, Expr);
 			fromT = Expr->type(Ctx);
 			if (fromT == 0) {
-				error("(INTERNAL) Dereferencing fail.");
+				throw new InternalError("Dereferencing fail.");
 				break;
 			}
 		} else {
@@ -362,7 +358,7 @@ TypeAST *CallExprAST::getType() {
 	if (funct != 0) {
 		// Check argument types
 		if (Args.size() != funct->Args.size()) {
-			return typeError(Tag, 
+			Tag.Throw(
 				"Wrong number of arguments for call to function of type " + funct->typeDescStr() + ".");
 		}
 		for (unsigned i = 0; i < Args.size(); i++) {
@@ -371,26 +367,26 @@ TypeAST *CallExprAST::getType() {
 			if (t != funct->Args[i]->ArgType) {
 				Args[i] = Args[i]->asTypeOrError(funct->Args[i]->ArgType);
 				if (Args[i] == 0) {
-					return typeError(Tag, "Wrong type for argument " + funct->Args[i]->Name + ".");
+					Tag.Throw("Wrong type for argument " + funct->Args[i]->Name + ".");
 				}
 			}
 		}
 		return funct->ReturnType;
 	} else {
 		cout << "Type of callee: " << t->typeDescStr() << endl;
-		return typeError(Tag, "Calling something that is not a function.");
+		Tag.Throw("Calling something that is not a function.");
 	}
 }
 
 TypeAST *IfThenElseAST::getType() {
 	TypeAST *condType = Cond->type(Ctx);
 	if (condType == 0) return 0;
-	if (condType != BOOLTYPE) return typeError(Tag, "Condition in 'if' must be boolean.");
+	if (condType != BOOLTYPE) Tag.Throw("Condition in 'if' must be boolean.");
 	
 	TypeAST *thenType = TrueBr->type(Ctx);
 	if (thenType == 0) return 0;
 	if (FalseBr == 0) {
-		if (thenType != VOIDTYPE) return typeError(Tag, "Expression in 'then' must be void when no 'else'.");
+		if (thenType != VOIDTYPE) Tag.Throw("Expression in 'then' must be void when no 'else'.");
 		return thenType;
 	}
 
@@ -400,7 +396,7 @@ TypeAST *IfThenElseAST::getType() {
 	if (thenType != elseType) {
 		FalseBr = FalseBr->asTypeOrError(thenType);
 		if (FalseBr == 0) {
-			return typeError(Tag, "Expression in 'then' and 'else' must be of same type.");
+			Tag.Throw("Expression in 'then' and 'else' must be of same type.");
 		}
 	}
 	return thenType;
@@ -409,7 +405,7 @@ TypeAST *IfThenElseAST::getType() {
 TypeAST *WhileAST::getType() {
 	TypeAST *condType = Cond->type(Ctx);
 	if (condType == 0) return 0;
-	if (condType != BOOLTYPE) return typeError(Tag, "Condition in while/until must be of type bool.");
+	if (condType != BOOLTYPE) Tag.Throw("Condition in while/until must be of type bool.");
 
 	TypeAST *contType = Inside->type(Ctx);
 	if (contType == 0) return 0;
@@ -428,19 +424,20 @@ TypeAST *BlockAST::getType() {
 		Ctx->NamedValues.push_back(new map<string, Symbol*>());
 	}
 	for (unsigned i = 0; i < Instructions.size(); i++) {
-		if (!Instructions[i]->typeCheck(Ctx)) {
+		try {
+			Instructions[i]->typeCheck(Ctx);
+		} catch (PIFError *e) {
 			if (DefAST *d = dynamic_cast<DefAST*>(Instructions[i])) {
-				return typeError(Tag, "Type checking error in definition of '" + d->Name + "'.");
+				Tag.Throw("Type checking error in definition of '" + d->Name + "'.", e);
 			} else {
-				return typeError(Tag, "Type checking error somewhere in this block.");
+				Tag.Throw("Type checking error somewhere in this block.", e);
 			}
 		}
 		if (DefAST *d = dynamic_cast<DefAST*>(Instructions[i])) {
 			Symbol *s = new Symbol(d);
 			s->SType = d->typeAtDef();
 			if (s->SType == 0) {
-				cerr << "probably a bug (BlockAST::getType())" << endl;
-				return 0;
+				throw InternalError("probably a bug (BlockAST::getType())");
 			}
 			Ctx->NamedValues.back()->insert(pair<string, Symbol*>(d->Name, s));
 		}
@@ -462,7 +459,7 @@ TypeAST *ReturnAST::getType() {
 				if (Val->type(Ctx) == retT) {
 					return VOIDTYPE;
 				} else {
-					return typeError(Tag, "Internal error #4525426");
+					Tag.Throw("Internal error #4525426");
 				}
 			}
 		}
@@ -471,7 +468,7 @@ TypeAST *ReturnAST::getType() {
 			return VOIDTYPE;
 		}
 	}
-	return typeError(Tag, "Return statement does not return correct type value.");
+	Tag.Throw("Return statement does not return correct type value.");
 }
 
 TypeAST *ExternAST::getType() {
@@ -500,42 +497,50 @@ TypeAST *FuncExprAST::getType() {
 
 // ============= Type checking in definitions ==========
 
-bool VarDefAST::typeCheck(Context *ctx) {
+void VarDefAST::typeCheck(Context *ctx) {
 	DBGC(cerr << "TC:\t"; Val->prettyprint(cerr); cerr << endl);
 
-	TypeAST* t2 = Val->type(ctx);
-	if (t2 == 0) {
-		cerr << Tag.str() << " Cannot determine type of value for '" << Name << "'." << endl;
-		return 0;
+	TypeAST* t2;
+	try {
+		t2 = Val->type(ctx);
+	} catch (PIFError *e) {
+		Tag.Throw("Cannot determine type of value for '" + Name + "'.", e);
 	}
 	if (VType == 0) {
 		VType = t2;
 	} else {
 		if (VType != t2) {
-			Val = Val->asTypeOrError(VType);
-			if (Val == 0) return false;
+			try {
+				Val = Val->asTypeOrError(VType);
+				if (Val == 0) Tag.Throw("Type check error for '" + Name + "'.");
+			} catch (PIFError* e) {
+				 Tag.Throw("Type check error for '" + Name + "'.", e);
+			}
 		}
 	}
-	return true;
 }
 
-bool FuncDefAST::typeCheck(Context *ctx) {
+void FuncDefAST::typeCheck(Context *ctx) {
 	DBGC(cerr << "TC:\t"; Val->prettyprint(cerr); cerr << endl);
 
-	return Val->type(ctx) != 0;
+	if (Val->type(ctx) == 0) Tag.Throw("Type check error for '" + Name + "'.");
 }
 
-bool ExternFuncDefAST::typeCheck(Context *ctx) {
+void ExternFuncDefAST::typeCheck(Context *ctx) {
 	DBGC(cerr << "TC:\t"; Val->prettyprint(cerr); cerr << endl);
 
-	if (EType == 0) return false;
-	if (Val->type(ctx) == 0) return false;
-	Val = dynamic_cast<ExternAST*>(Val->asTypeOrError(RefTypeAST::Get(EType)));
-	return (Val != 0);
+	try {
+		if (EType == 0) Tag.Throw("Extern with no type : '" + Name + "'.");
+		if (Val->type(ctx) == 0) Tag.Throw("Cannot evaluate type of :'" + Name + "'.");
+		Val = dynamic_cast<ExternAST*>(Val->asTypeOrError(RefTypeAST::Get(EType)));
+		if (Val == 0) Tag.Throw("Type check error for '" + Name + "'.");
+	} catch (PIFError *e) {
+		Tag.Throw("Type check error for '" + Name + "'.", e);
+	}
 }
 
-bool ExprStmtAST::typeCheck(Context *ctx) {
-	return (Expr->type(ctx) != 0);
+void ExprStmtAST::typeCheck(Context *ctx) {
+	if (Expr->type(ctx) == 0) Tag.Throw("Type check error.");
 }
 
 // *****

@@ -1,13 +1,9 @@
-#include "AST-stmt.h"
+#include "../ast/stmt.h"
 #include "Generator.h"
+#include "../error.h"
 
 using namespace llvm;
 using namespace std;
-
-void *ExprAST::error(const string &msg) {
-	cerr << Tag.str() << " Error: " << msg << endl;
-	return 0;
-}
 
 
 Value *BoolExprAST::Codegen() {
@@ -23,7 +19,7 @@ Value *FloatExprAST::Codegen() {
 }
 
 Value *VarExprAST::Codegen() {
-	if (Sym == 0) return (Value*) error(" (INTERNAL) Type checking didn't go here, that's bad.");
+	if (Sym == 0) throw new InternalError("Type checking didn't go here, that's bad.");
 	if (IsGlobalConst) return Ctx->Gen->Builder.CreateLoad(Sym->llvmVal, "tmpload");
 	return Sym->llvmVal;
 }
@@ -46,7 +42,7 @@ Value *UnaryExprAST::Codegen() {
 	} else if (Op == "!") {
 		return Ctx->Gen->Builder.CreateNot(v, "nottmp");
 	} else {
-		return (Value*) error("(INTERNAL) Unknown unary operator '" + Op + "'.");
+		throw new InternalError("Unknown unary operator '" + Op + "'.");
 	}
 }
 
@@ -96,7 +92,7 @@ Value *BinaryExprAST::Codegen() {
 			} else if (Op == "!=") {
 				return builder.CreateFCmpONE(L, R, "cmptmp");
 			} else {
-				return (Value*) error("Operator '" + Op +"' not defined for floats.");
+				throw new InternalError("Operator '" + Op +"' not defined for floats, typechecking fail.");
 			}
 		} else if (li != 0 && ri != 0) {
 			if (Op == "+") {
@@ -146,13 +142,13 @@ Value *BinaryExprAST::Codegen() {
 			} else if (Op == "!=") {
 				return builder.CreateICmpNE(L, R, "cmptmp");
 			} else {
-				return (Value*) error("Operator '" + Op +"' not defined for ints.");
+				throw new InternalError("Operator '" + Op +"' not defined for ints, typecheck fail.");
 			}
 		} else {
-			return (Value*) error("(INTERNAL) Cannot '" + Op + "' on something else than two ints or two floats.");
+			throw new InternalError("Cannot '" + Op + "' on something else than two ints or two floats.");
 		}
 	} else {
-		return (Value*) error("(INTERNAL) Unimplemented operator");
+		throw new InternalError("Unimplemented operator");
 	}
 }
 
@@ -160,7 +156,7 @@ Value *DotMemberExprAST::Codegen() {
 	if (Member == "") {
 		return Obj->Codegen();
 	} else {
-		return (Value*) error("(INTERNAL) '.' action not implemented.");
+		throw new InternalError("'.' action not implemented.");
 	}
 }
 
@@ -171,7 +167,7 @@ Value *CastExprAST::Codegen() {
 		return v;
 	} else {
 		v = FType->castCodegen(v, Expr->type(Ctx), Ctx);
-		if (v == 0) return (Value*) error("Bad cast.");
+		if (v == 0) throw new InternalError("Bad cast.");
 		return v;
 	}
 }
@@ -184,7 +180,7 @@ Value *CallExprAST::Codegen() {
 		funcType = dynamic_cast<FuncTypeAST*>(reft->VType);
 	}
 	if (funcType == 0) {
-		return (Value*) error(" (INTERNAL) Not a function type value is being called like a function.");
+		throw new InternalError("Not a function type value is being called like a function.");
 	}
 
 	Value *calleev = Callee->Codegen();
@@ -193,10 +189,10 @@ Value *CallExprAST::Codegen() {
 	if (PointerType *pt = dyn_cast<PointerType>(calleev->getType())) {
 		CalleeFT = dyn_cast<FunctionType>(pt->getElementType());
 	}
-	if (CalleeFT == 0) return (Value*) error(" (INTERNAL) Trying to call something that is not a function.");
+	if (CalleeFT == 0) throw new InternalError("Trying to call something that is not a function.");
 
 	if (funcType->Args.size() != Args.size())
-		return (Value*) error(" (INTERNAL) Incorect argument count.");
+		throw new InternalError("Incorect argument count.");
 	
 	std::vector<Value*> ArgsV;
 	for (unsigned i = 0; i < Args.size(); i++) {
@@ -205,7 +201,7 @@ Value *CallExprAST::Codegen() {
 		Type *avT = av->getType(), *expectedT = funcType->Args[i]->ArgType->getTy();
 
 		if (avT != expectedT) {
-			return (Value*) error(" (INTERNAL) Mismatch type for argument " + funcType->Args[i]->Name);
+			throw new InternalError("Mismatch type for argument " + funcType->Args[i]->Name);
 		}
 		ArgsV.push_back(av);
 		if (ArgsV.back() == 0) return 0;
@@ -259,7 +255,7 @@ Value *IfThenElseAST::Codegen() {
 	builder.SetInsertPoint(MergeBB);
 	if (ThenV != 0 && ElseV != 0) {
 		if (ThenV->getType() != ElseV->getType()) {
-			return (Value*)error("(INTERNAL) Not same types for then and else in if construct.");
+			throw new InternalError("Not same types for then and else in if construct.");
 		} else {
 			PHINode *PN = builder.CreatePHI(ThenV->getType(), 2, "iftmp");
 			PN->addIncoming(ThenV, ThenBB);
@@ -314,10 +310,10 @@ Value *WhileAST::Codegen() {
 
 Value *BreakContAST::Codegen() {
 	if (SType == bc_break) {
-		if (Ctx->More->BreakTo == 0) return (Value*) error("Nowhere to break to.");
+		if (Ctx->More->BreakTo == 0) throw new InternalError("Nowhere to break to.");
 		Ctx->Gen->Builder.CreateBr(Ctx->More->BreakTo);
 	} else {
-		if (Ctx->More->ContinueTo == 0) return (Value*) error("Nowhere to break to.");
+		if (Ctx->More->ContinueTo == 0) throw new InternalError("Nowhere to break to.");
 		Ctx->Gen->Builder.CreateBr(Ctx->More->ContinueTo);
 	}
 	return 0;
@@ -326,13 +322,13 @@ Value *BreakContAST::Codegen() {
 Value *BlockAST::Codegen() {
 	for (unsigned i = 0; i < Instructions.size(); i++) {
 		if (Ctx->Gen->Builder.GetInsertBlock()->getTerminator() != 0) {
-			return (Value*)error(" You are writing code somewhere after your function has already returned.");
+			Instructions[i]->Tag.Throw("You are writing code somewhere after your function has already returned.");
 		}
 		if (DefAST *d = dynamic_cast<DefAST*>(Instructions[i])) {
 			if (VarDefAST *vd = dynamic_cast<VarDefAST*>(d)) {
 				Value* val = vd->Val->Codegen();
 				if (Ctx->NamedValues.back()->count(vd->Name) == 0) {
-					 return (Value*)error(" (INTERNAL) Variable is declared, but not really.");
+					 throw new InternalError("Variable is declared, but not really.");
 				}
 				Symbol *s = Ctx->NamedValues.back()->find(vd->Name)->second;
 				if (vd->Var) {
@@ -342,12 +338,12 @@ Value *BlockAST::Codegen() {
 					s->llvmVal = val;
 				}
 			} else {
-				return (Value*)error(" Non-toplevel functions not implemented.");
+				throw new InternalError("Non-toplevel functions not implemented.");
 			}
 		} else if (ExprStmtAST *e = dynamic_cast<ExprStmtAST*>(Instructions[i])) {
 			e->Expr->Codegen();
 		} else {
-			return (Value*)error(" (INTERNAL) Something that should not be here is in a block.");
+			throw new InternalError("Something that should not be here is in a block.");
 		}
 	}
 	return 0;
@@ -357,13 +353,13 @@ Value *BlockAST::Codegen() {
 // Functions AST
 
 Value *FuncExprAST::Codegen() {
-	return (Value*) error("Lambda functions not implemented.");
+	throw new InternalError("Lambda functions not implemented.");
 }
 
 Value *ExternAST::Codegen() {
 	Module *mod = Ctx->Gen->TheModule;
 
-	if (SType == 0) return (Value*) error(" (INTERNAL) Extern has no type.");
+	if (SType == 0) throw new InternalError("Extern has no type.");
 
 	if (FuncTypeAST *ftype = dynamic_cast<FuncTypeAST*>(SType)) {
 		FunctionType *ft = dyn_cast<FunctionType>(SType->getTy());
@@ -373,13 +369,13 @@ Value *ExternAST::Codegen() {
 			f->eraseFromParent();
 			f = mod->getFunction(Symbol);
 			if (!f->empty()) {
-				return (Value*) error("Redefinition of extern function '" + Symbol + "'.");
+				throw new PIFError("Redefinition of extern function '" + Symbol + "'.");
 			}
 			if (f->arg_size() != ftype->Args.size()) {
-				return (Value*) error("Redefinition of extern function '" + Symbol + "' with different argument count.");
+				throw new PIFError("Redefinition of extern function '" + Symbol + "' with different argument count.");
 			}
 		}
 		return f;
 	}
-	return (Value*) error("Extern symbols that are not functions are not supported yet.");
+	throw new InternalError("Extern symbols that are not functions are not supported yet.");
 }

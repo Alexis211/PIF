@@ -2,8 +2,22 @@
 #include <cstdio>
 
 #include "Lexer.h"
+#include "../error.h"
 
 using namespace std;
+
+// Tag throw
+
+void FTag::Throw(string m) const {
+	throw new LangError(*this, m);
+}
+
+void FTag::Throw(string m, PIFError *p) const {
+	throw new LangError(*this, m, p);
+}
+
+//
+
 
 Lexer::Lexer(std::string file, std::istream &in) : File(file), In(in) {
 	LastChar = ' ';

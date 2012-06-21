@@ -1,12 +1,5 @@
 #include "Parser.h"
-
-
-// ERRORS
-
-void *Parser::error(const std::string &msg) {
-	std::cerr << Lex.tag().str() << " Error: " << msg << std::endl;
-	return 0;
-}
+#include "../error.h"
 
 // Expression parsing
 
@@ -35,8 +28,7 @@ ExprAST *Parser::ParseFloatExpr() {
 ExprAST *Parser::ParseParenExpr() {
 	Lex.gettok();	// eat '('
 	ExprAST *v = ParseExpression();
-	if (!v) return 0;
-	if (Lex.tokStr != ")") return (ExprAST*) error("Expected ')'.");
+	if (Lex.tokStr != ")") Lex.tag().Throw("Expected ')'.");
 	Lex.gettok();	// eat ')'
 	return v;
 }
@@ -73,10 +65,10 @@ ExprAST *Parser::ParsePrimary() {
 		return new BreakContAST(Lex.tag(), t);
 	}
 	if (Lex.tokStr == "(") return ParseParenExpr();
-	ExprAST *ret = (ExprAST*) error("Unknown token '" + Lex.tokStr + "' when expecting an expression.");
-	Lex.gettok();
-	return ret;
+	Lex.tag().Throw("Unknown token '" + Lex.tokStr + "' when expecting an expression.");
+	return 0;
 }
+
 
 // expression
 //		::= primary binoprhs
@@ -91,14 +83,12 @@ ExprAST *Parser::ParseExpression() {
 			return new ReturnAST(Lex.tag(), 0);
 		} else {
 			ExprAST *v = ParseExpression();
-			if (v == 0) return 0;
 			return new ReturnAST(Lex.tag(), v);
 		}
 	} else {
 		ExprAST *LHS = ParseBinOpLHS();
 		return ParseBinOpRHS(0, LHS);
 	}
-	return 0;
 }
 
 // binoplhs
@@ -120,7 +110,7 @@ ExprAST *Parser::ParseBinOpRHS(int ExprPrec, ExprAST *LHS) {
 		int tokPrec = getBinopPrec(Lex.tokStr);
 
 		if (tokPrec < ExprPrec) {
-			if (LHS == 0) return (ExprAST*)error("(INTERNAL) Bad LHS.");
+			if (LHS == 0) throw new PIFError("Bad LHS.");
 			return LHS;
 		}
 
@@ -163,7 +153,7 @@ ExprAST *Parser::ParseBinOpRHS(int ExprPrec, ExprAST *LHS) {
 //		::= '.' identifier
 ExprAST *Parser::ParseDotMember(ExprAST *obj) {
 	Lex.gettok();	// eat '.'
-	if (Lex.tok != tok_identifier) return (ExprAST*) error("Expected identifier after '.'.");
+	if (Lex.tok != tok_identifier) Lex.tag().Throw("Expected identifier after '.'.");
 	std::string id = Lex.tokStr;
 	Lex.gettok();
 
@@ -179,11 +169,10 @@ ExprAST *Parser::ParseCall(ExprAST *callee) {
 	if (Lex.tokStr != ")") {
 		while (1) {
 			ExprAST *arg = ParseExpression();
-			if (!arg) return 0;
 			args.push_back(arg);
 
 			if (Lex.tokStr == ")") break;
-			if (Lex.tokStr != ",") return (ExprAST*) error("Expected ')' or ',' in parameter list.");
+			if (Lex.tokStr != ",") Lex.tag().Throw("Expected ')' or ',' in parameter list.");
 			Lex.gettok();
 		}
 	}
@@ -196,7 +185,7 @@ ExprAST *Parser::ParseCall(ExprAST *callee) {
 //		::= extern symbol_name ':' type
 ExprAST *Parser::ParseExtern() {
 	Lex.gettok();		// eat 'extern'
-	if (Lex.tok != tok_identifier) return (ExprAST*) error("Expected identifier after 'extern', not '" + Lex.tokStr + "'.");
+	if (Lex.tok != tok_identifier) Lex.tag().Throw("Expected identifier after 'extern', not '" + Lex.tokStr + "'.");
 	std::string sym = Lex.tokStr;
 	Lex.gettok();		// eat identifier
 	TypeAST *type = 0;
@@ -216,17 +205,14 @@ ExprAST *Parser::ParseIfThenElse() {
 	Lex.gettok();	// eat if
 
 	ExprAST *cond = ParseExpression();
-	if (cond == 0) return 0;
 
 	if (Lex.tok == tok_then) Lex.gettok();
 	ExprAST *trueE = ParseExpression();
-	if (trueE == 0) return 0;
 
 	ExprAST *falseE = 0;
 	if (Lex.tok == tok_else) {
 		Lex.gettok();
 		falseE = ParseExpression();
-		if (falseE == 0) return 0;
 	}
 
 	return new IfThenElseAST(tag, cond, trueE, falseE);
@@ -242,11 +228,9 @@ ExprAST *Parser::ParseWhile() {
 	Lex.gettok();		// eat while or until
 
 	ExprAST *cond = ParseExpression();
-	if (cond == 0) return 0;
 	
 	if (Lex.tok == tok_do) Lex.gettok();
 	ExprAST *cont = ParseExpression();
-	if (cont == 0) return 0;
 
 	return new WhileAST(tag, cond, cont, isUntil);
 }
@@ -264,10 +248,8 @@ ExprAST *Parser::ParseBlock() {
 			s = ParseVarDefinition();
 		} else {
 			ExprAST* e = ParseExpression();
-			if (e == 0) return 0;
 			s = new ExprStmtAST(tag, e);
 		}
-		if (s == 0) return 0;
 		instructions.push_back(s);
 		if (Lex.tokStr == ";") Lex.gettok();	// eat ';'
 	}

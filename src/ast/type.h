@@ -1,9 +1,9 @@
 #ifndef DEF_AST_TYPE_H
 #define DEF_AST_TYPE_H
 
-#include "config.h"
+#include "../config.h"
 
-#include "Lexer.h"
+#include "../lexer/Lexer.h"
 
 #include <string>
 #include <map>

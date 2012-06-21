@@ -1,7 +1,7 @@
 #ifndef DEF_GENERATOR_H
 #define DEF_GENERATOR_H
 
-#include "Package.h"
+#include "../Package.h"
 
 #include <llvm/PassManager.h>
 
@@ -28,9 +28,9 @@ class Generator {
 
 	Generator();
 
-	bool build(Package *package);
+	void build(Package *package);
 	void init(Package *package);
-	bool main(Package *package);
+	void main(Package *package);
 };
 
 

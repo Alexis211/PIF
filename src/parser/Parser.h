@@ -1,17 +1,14 @@
 #ifndef DEF_PARSER_H
 #define DEF_PARSER_H
 
-#include "AST-expr.h"
-#include "AST-stmt.h"
-#include "Lexer.h"
+#include "../ast/expr.h"
+#include "../ast/stmt.h"
+#include "../lexer/Lexer.h"
 
 class Parser {
 	private:
 	Lexer &Lex;
 	std::map<std::string, int> BinopPrecedence;
-
-	// Errors
-	void* error(const std::string &msg);
 
 	ExprAST *ParseBoolExpr();
 	ExprAST *ParseIntExpr();

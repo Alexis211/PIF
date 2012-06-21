@@ -6,7 +6,7 @@
 #include <sstream>
 #include <set>
 
-#include "config.h"
+#include "../config.h"
 
 enum Token {
 	tok_eof,
@@ -38,6 +38,7 @@ enum Token {
 	tok_continue,
 };
 
+class PIFError;
 class FTag {			// Identifies a position in a file
 	private:
 	std::string File, Tok;
@@ -50,6 +51,9 @@ class FTag {			// Identifies a position in a file
 		out << "[" << File << ":" << Line << " near '" << Tok << "']";
 		return out.str();
 	}
+
+	void Throw(std::string message) const;
+	void Throw(std::string message, PIFError *p) const;
 };
 
 class Lexer {

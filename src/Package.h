@@ -7,8 +7,8 @@
 
 #include "config.h"
 
-#include "AST-stmt.h"
-#include "AST-expr.h"
+#include "ast/stmt.h"
+#include "ast/expr.h"
 
 class Generator;
 class Package;
@@ -78,12 +78,12 @@ class Package {
 
 	Package(Generator *gen, std::string name);
 
-	bool inputFile(std::string filename);
-	bool typeCheck();
+	void inputFile(std::string filename);
+	void typeCheck();
 
-	bool import(ImportAST *def);
+	void import(ImportAST *def);
 
-	bool importAndRunMain(std::string pkg);
+	void importAndRunMain(std::string pkg);
 
 	Package *getImport(std::string name);
 };

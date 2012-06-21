@@ -33,7 +33,7 @@ TypeAST *Parser::ParseType() {
 		Lex.gettok();
 		return ret;
 	}
-	return (TypeAST*) error("Invalid type definiton, starting by '" + Lex.tokStr + "'.");
+	Lex.tag().Throw("Invalid type definiton, starting by '" + Lex.tokStr + "'.");
 }
 
 
@@ -42,13 +42,12 @@ TypeAST *Parser::ParseType() {
 //		::= id ':' type
 //		::= id ':' type '=' default 	TODO!!
 FuncArgAST *Parser::ParseFuncArg() {
-	if (Lex.tok != tok_identifier) return (FuncArgAST*) error("Expected identifier for argument name.");
+	if (Lex.tok != tok_identifier) Lex.tag().Throw("Expected identifier for argument name.");
 	std::string name = Lex.tokStr;
 	Lex.gettok();		// eat identifier
-	if (Lex.tokStr != ":") return (FuncArgAST*) error("Expected argument type.");
+	if (Lex.tokStr != ":") Lex.tag().Throw("Expected argument type.");
 	Lex.gettok();		// eat ':'
 	TypeAST *type = ParseType();
-	if (type == 0) return 0;
 	return new FuncArgAST(name, type);
 }
 
@@ -65,13 +64,13 @@ FuncTypeAST *Parser::ParsePrototype() {
 			args.push_back(arg);
 
 			if (Lex.tokStr == ")") break;
-			if (Lex.tokStr != ",") return (FuncTypeAST*) error("Expected ')' or ',' in argument list.");
+			if (Lex.tokStr != ",") Lex.tag().Throw("Expected ')' or ',' in argument list.");
 			Lex.gettok();
 		}
 	}
 
 	Lex.gettok();	// eat ')'
-	if (Lex.tokStr != "->") return (FuncTypeAST*) error("Invalid prototype : was expecting '->', not '" + Lex.tokStr + "'.");
+	if (Lex.tokStr != "->") Lex.tag().Throw("Invalid prototype : was expecting '->', not '" + Lex.tokStr + "'.");
 	Lex.gettok();	// eat '->'
 	if (Lex.tokStr == "{") {
 		return FuncTypeAST::Get(args, VOIDTYPE);

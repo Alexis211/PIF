@@ -1,6 +1,6 @@
-#include "AST-stmt.h"
+#include "../ast/stmt.h"
 #include "Generator.h"
-#include "Package.h"
+#include "../Package.h"
 
 using namespace llvm;
 using namespace std;
