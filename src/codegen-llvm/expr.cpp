@@ -5,6 +5,7 @@
 using namespace llvm;
 using namespace std;
 
+#define CHECK_VOID(v) if (v == 0) throw new InternalError("null (void) value somewhere bad (statement used as expression)");
 
 Value *BoolExprAST::Codegen() {
 	return ConstantInt::get(getGlobalContext(), APInt(1, (Val ? 1 : 0), false));
@@ -26,7 +27,7 @@ Value *VarExprAST::Codegen() {
 
 Value *DerefExprAST::Codegen() {
 	Value *v = Val->Codegen();
-	if (v == 0) return 0;
+	CHECK_VOID(v)
 	return Ctx->Gen->Builder.CreateLoad(v, "tmpderef");
 }
 
@@ -52,14 +53,16 @@ Value *BinaryExprAST::Codegen() {
 	if (Op == "=") {
 		Value *L = LHS->Codegen();
 		Value *R = RHS->Codegen();
-		if (L == 0 || R == 0) return 0;
+		CHECK_VOID(L)
+		CHECK_VOID(R)
 		builder.CreateStore(R, L);
 		return R;
 	} else if (Op == "*" || Op == "+" || Op == "-" || Op == "/"  || Op == "%" ||
 			Op == "<" || Op == ">" || Op == "==" || Op == "!=" || Op == "<=" || Op == ">=") {
 		Value *L = LHS->Codegen();
 		Value *R = RHS->Codegen();
-		if (L == 0 || R == 0) return 0;
+		CHECK_VOID(L)
+		CHECK_VOID(R)
 
 		IntTypeAST* li = dynamic_cast<IntTypeAST*>(LHS->type(Ctx)); 
 		IntTypeAST* ri = dynamic_cast<IntTypeAST*>(RHS->type(Ctx)); 
@@ -204,14 +207,12 @@ Value *CallExprAST::Codegen() {
 			throw new InternalError("Mismatch type for argument " + funcType->Args[i]->Name);
 		}
 		ArgsV.push_back(av);
-		if (ArgsV.back() == 0) return 0;
+		CHECK_VOID(ArgsV.back())
 	}
 
 	if (CalleeFT->getReturnType() == Type::getVoidTy(getGlobalContext())) {
-		builder.CreateCall(calleev, ArgsV);
-		return 0;
+		return builder.CreateCall(calleev, ArgsV);
 	}
-	
 	return builder.CreateCall(calleev, ArgsV, "calltmp");
 }
 
@@ -219,7 +220,7 @@ Value *ReturnAST::Codegen() {
 	if (Val == 0) return Ctx->Gen->Builder.CreateRetVoid();
 
 	Value *v = Val->Codegen();
-	if (v == 0) return 0;
+	CHECK_VOID(v)
 	return Ctx->Gen->Builder.CreateRet(v);
 }
 
@@ -227,7 +228,7 @@ Value *IfThenElseAST::Codegen() {
 	IRBuilder<> &builder = Ctx->Gen->Builder;
 
 	Value *CondV = Cond->Codegen();
-	if (CondV == 0) return 0;
+	CHECK_VOID(CondV)
 
 	Function *fun = builder.GetInsertBlock()->getParent();
 	BasicBlock *ThenBB = BasicBlock::Create(getGlobalContext(), "then", fun);
@@ -280,7 +281,7 @@ Value *WhileAST::Codegen() {
 	builder.SetInsertPoint(CondBB);
 
 	Value *CondV = Cond->Codegen();
-	if (CondV == 0) return 0;
+	CHECK_VOID(CondV)
 
 	if (IsUntil) {
 		builder.CreateCondBr(CondV, MergeBB, DoBB);

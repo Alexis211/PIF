@@ -25,9 +25,6 @@ Generator::Generator() :
 }
 
 void Generator::build(Package *pkg) {
-	/*cerr << "GENERATOR SAYS: Wait a minute. This isn't ready yet." << endl;
-	return false;*/
-
 	string prefix = pkg->SymbolPrefix;
 
 	// Setup package symbol table

@@ -69,14 +69,22 @@ func _main : () -> {
 	find_primes(42 * 12)
 
 	test_fibo()
+
+	find_primes (1000000000000)
 }
 
 func find_primes : (max : int) -> {
 	var i = 1
+	var k = 0
 	while i < max {
 		i = i + 1
 		if !math.is_prime(i) continue
 		util.print_int(i)
+		k = k + 1
+		if k == 15 {
+			util.print_nl()
+			k = 0
+		}
 	}
 	util.print_nl()
 }

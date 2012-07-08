@@ -33,7 +33,7 @@ std::string BaseTypeAST::typeDescStr() {
 	if (BaseType == bt_void) return "void";
 	if (BaseType == bt_bool) return "bool";
 	if (BaseType == bt_float) return "float";
-	return "[unknown base type]";
+	throw new InternalError("unknown base type");
 }
 
 std::string IntTypeAST::typeDescStr() {
